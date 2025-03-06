@@ -1,3 +1,10 @@
+raspi-config (20250306) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Allow console and desktop autologin to be set independently
+
+ -- Simon Long <simon@raspberrypi.com>  Thu, 06 Mar 2025 16:16:11 +0000
+
 raspi-config (20250210) bookworm; urgency=medium
 
   [ Simon Long ]
