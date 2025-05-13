@@ -1,3 +1,10 @@
+raspi-config (20250513) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Make compatible with new and old session files
+
+ -- Simon Long <simon@raspberrypi.com>  Tue, 13 May 2025 11:48:36 +0100
+
 raspi-config (20250312) bookworm; urgency=medium
 
   [ Simon Long ]
