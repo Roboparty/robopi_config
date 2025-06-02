@@ -930,11 +930,14 @@ do_wifi_country() {
   if [ "$INTERACTIVE" = True ]; then
     whiptail --msgbox "Wireless LAN country set to $REGDOMAIN" 20 60 1
   fi
-  if ! ischroot && pgrep wf-panel-pi > /dev/null; then
-    wfpanelctl netman cset
-  fi
-  if ! ischroot && pgrep lxpanel > /dev/null; then
-    lxpanelctl command netman cset
+  if ! ischroot; then
+    if pgrep -x wf-panel-pi > /dev/null; then
+      wfpanelctl netman cset
+    elif pgrep -x lxpanel-pi > /dev/null; then
+      lxpanelctl-pi command netman cset
+    elif pgrep -x lxpanel > /dev/null; then
+      lxpanelctl command netman cset
+    fi
   fi
 }
 
