@@ -2297,6 +2297,42 @@ do_boot_order() {
   fi
 }
 
+do_beta_mode() {
+  if [ "$INTERACTIVE" = True ]; then
+    BETAOPT=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Beta Access" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+      "B1 Beta Software" "Use the beta software repository and bootloader image" \
+      "B2 Release Software" "Use the release software repository" \
+      3>&1 1>&2 2>&3)
+  else
+    BETAOPT=$1
+    true
+  fi
+  if [ $? -eq 0 ]; then
+    case "$BETAOPT" in
+      B1*)
+        sed /etc/default/rpi-eeprom-update -i -e "s/^FIRMWARE_RELEASE_STATUS.*/FIRMWARE_RELEASE_STATUS=\"latest\"/"
+        cat > /etc/apt/sources.list.d/beta.list << EOF
+deb http://archive.raspberrypi.com/debian/ bookworm beta
+#deb-src http://archive.raspberrypi.com/debian/ bookworm beta
+EOF
+        BETA="Beta"
+        ;;
+      B2*)
+        rm -f /etc/apt/sources.list.d/beta.list
+        BETA="Release"
+        ;;
+      *)
+        whiptail --msgbox "Programmer error, unrecognised bootloader option" 20 60 2
+        return 1
+        ;;
+    esac
+    if [ "$INTERACTIVE" = True ]; then
+         whiptail --msgbox "$BETA software enabled. Please use sudo apt update to refresh the repository." 20 60 2
+    fi
+     ASK_TO_REBOOT=1
+  fi
+}
+
 
 do_boot_rom() {
   if [ "$INTERACTIVE" = True ]; then
@@ -4074,7 +4110,7 @@ do_advanced_menu() {
       "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
       "A3 Network Proxy Settings" "Configure network proxy settings" \
       "A4 Boot Order" "Choose boot device priority (SD/net/USB/NVMe)" \
-      "A5 Bootloader Version" "Select bootloader (latest/factory default)" \
+      "A5 Beta Access" "Select beta or release software repository" \
       "A6 Wayland" "Switch between X and Wayland backends" \
       "A7 Audio Config" "Set audio control system" \
       "A8 PCIe Speed" "Set PCIe x1 port speed" \
@@ -4109,7 +4145,7 @@ do_advanced_menu() {
       A2\ *) do_net_names ;;
       A3\ *) do_proxy_menu ;;
       A4\ *) do_boot_order ;;
-      A5\ *) do_boot_rom ;;
+      A5\ *) do_beta_mode ;;
       A6\ *) do_wayland ;;
       A7\ *) do_audioconf ;;
       A8\ *) do_pci ;;
