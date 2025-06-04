@@ -2322,7 +2322,7 @@ EOF
         BETA="Release"
         ;;
       *)
-        whiptail --msgbox "Programmer error, unrecognised bootloader option" 20 60 2
+        whiptail --msgbox "Programmer error, unrecognised option" 20 60 2
         return 1
         ;;
     esac
