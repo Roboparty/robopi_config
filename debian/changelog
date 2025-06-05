@@ -1,4 +1,4 @@
-raspi-config (20250506) bookworm; urgency=medium
+raspi-config (20250605) bookworm; urgency=medium
 
   [ Simon Long ]
   * Add beta switching
