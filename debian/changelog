@@ -1,7 +1,8 @@
-raspi-config (20250513) bookworm; urgency=medium
+raspi-config (20250506) bookworm; urgency=medium
 
   [ Simon Long ]
-  * Make compatible with new and old session files
+  * Add beta switching
+  * Make compatible with new session files and X panel
 
  -- Simon Long <simon@raspberrypi.com>  Tue, 13 May 2025 11:48:36 +0100
 
