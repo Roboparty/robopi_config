@@ -2300,7 +2300,7 @@ do_boot_order() {
 do_beta_mode() {
   if [ "$INTERACTIVE" = True ]; then
     BETAOPT=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Beta Access" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
-      "B1 Beta Software" "Use the beta software repository and bootloader image" \
+      "B1 Beta Software" "Use the beta repository and latest bootloader image" \
       "B2 Release Software" "Use the release software repository" \
       3>&1 1>&2 2>&3)
   else

@@ -1,3 +1,11 @@
+raspi-config (20250612) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Change wording of beta option
+  * Add compatibility with new greeter session names
+
+ -- Simon Long <simon@raspberrypi.com>  Thu, 12 Jun 2025 09:47:42 +0100
+
 raspi-config (20250605) bookworm; urgency=medium
 
   [ Simon Long ]
