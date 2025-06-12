@@ -2817,15 +2817,19 @@ do_wayland() {
     if [ -f /usr/share/xsessions/rpd-x.desktop ] ; then
       XSESSION=rpd-x
       WSESSION=rpd-labwc
+      XGSESSION=pi-greeter-x
+      WGSESSION=pi-greeter-labwc
     else
       XSESSION=LXDE-pi-x
       WSESSION=LXDE-pi-labwc
+      XGSESSION=pi-greeter
+      WGSESSION=pi-greeter-labwc
     fi
     case "$RET" in
       W1*)
         sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?user-session.*/user-session=$XSESSION/"
         sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?autologin-session.*/autologin-session=$XSESSION/"
-        sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?greeter-session.*/greeter-session=pi-greeter/"
+        sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?greeter-session.*/greeter-session=$XGSESSION/"
         sed /etc/lightdm/lightdm.conf -i -e "s/^fallback-test.*/#fallback-test=/"
         sed /etc/lightdm/lightdm.conf -i -e "s/^fallback-session.*/#fallback-session=/"
         sed /etc/lightdm/lightdm.conf -i -e "s/^fallback-greeter.*/#fallback-greeter=/"
@@ -2849,7 +2853,7 @@ do_wayland() {
       W3*)
         sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?user-session.*/user-session=$WSESSION/"
         sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?autologin-session.*/autologin-session=$WSESSION/"
-        sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?greeter-session.*/greeter-session=pi-greeter-labwc/"
+        sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?greeter-session.*/greeter-session=$WGSESSION/"
         sed /etc/lightdm/lightdm.conf -i -e "s/^fallback-test.*/#fallback-test=/"
         sed /etc/lightdm/lightdm.conf -i -e "s/^fallback-session.*/#fallback-session=/"
         sed /etc/lightdm/lightdm.conf -i -e "s/^fallback-greeter.*/#fallback-greeter=/"
