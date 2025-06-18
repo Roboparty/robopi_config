@@ -1,3 +1,10 @@
+raspi-config (20250618) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Check for both new X and Wayland session names when determining which to use
+
+ -- Simon Long <simon@raspberrypi.com>  Wed, 18 Jun 2025 08:06:02 +0100
+
 raspi-config (20250612) bookworm; urgency=medium
 
   [ Simon Long ]
