@@ -2814,7 +2814,7 @@ do_wayland() {
     true
   fi
   if [ $? -eq 0 ]; then
-    if [ -f /usr/share/xsessions/rpd-x.desktop ] ; then
+    if [ -f /usr/share/xsessions/rpd-x.desktop ] || [ -f /usr/share/wayland-sessions/rpd-labwc.desktop ]; then
       XSESSION=rpd-x
       WSESSION=rpd-labwc
       XGSESSION=pi-greeter-x
