@@ -586,10 +586,14 @@ do_blanking() {
     if [ "$RET" -eq 0 ] ; then
       echo "swayidle -w timeout 600 'wlopm --off \\*' resume 'wlopm --on \\*' &" >> $LABWCAST_FILE
       chown $USER:$USER $LABWCAST_FILE
+      echo "swayidle -w timeout 600 'wlopm --off \\*' resume 'wlopm --on \\*' &" >> /etc/xdg/labwc-greeter/autostart
       STATUS=enabled
     elif [ "$RET" -eq 1 ]; then
       if [ -e $LABWCAST_FILE ] ; then
         sed -i '/swayidle/d' $LABWCAST_FILE
+      fi
+      if [ -e /etc/xdg/labwc-greeter/autostart ] ; then
+        sed -i '/swayidle/d' /etc/xdg/labwc-greeter/autostart
       fi
       STATUS=disabled
     else
