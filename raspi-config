@@ -2302,6 +2302,8 @@ do_boot_order() {
 }
 
 do_beta_mode() {
+  DVER=$(lsb_release -c | cut -f 2)
+
   if [ "$INTERACTIVE" = True ]; then
     BETAOPT=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Beta Access" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "B1 Beta Software" "Use the beta repository and latest bootloader image" \
@@ -2316,8 +2318,8 @@ do_beta_mode() {
       B1*)
         sed /etc/default/rpi-eeprom-update -i -e "s/^FIRMWARE_RELEASE_STATUS.*/FIRMWARE_RELEASE_STATUS=\"latest\"/"
         cat > /etc/apt/sources.list.d/beta.list << EOF
-deb http://archive.raspberrypi.com/debian/ bookworm beta
-#deb-src http://archive.raspberrypi.com/debian/ bookworm beta
+deb http://archive.raspberrypi.com/debian/ $DVER beta
+#deb-src http://archive.raspberrypi.com/debian/ $DVER beta
 EOF
         BETA="Beta"
         ;;
