@@ -1,3 +1,10 @@
+raspi-config (20250703) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Add beta option for Pi 3 and below
+
+ -- Simon Long <simon@raspberrypi.com>  Thu, 03 Jul 2025 15:03:28 +0100
+
 raspi-config (20250618) bookworm; urgency=medium
 
   [ Simon Long ]

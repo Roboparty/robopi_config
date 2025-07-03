@@ -123,14 +123,6 @@ get_pi_type() {
   fi
 }
 
-gpu_has_mmu() {
-  if is_pifour || is_pifive ; then
-    return 0
-  else
-    return 1
-  fi
-}
-
 is_live() {
   grep -q "boot=live" $CMDLINE
   return $?
@@ -2316,7 +2308,9 @@ do_beta_mode() {
   if [ $? -eq 0 ]; then
     case "$BETAOPT" in
       B1*)
-        sed /etc/default/rpi-eeprom-update -i -e "s/^FIRMWARE_RELEASE_STATUS.*/FIRMWARE_RELEASE_STATUS=\"latest\"/"
+        if is_pifour || is_pifive ; then
+          sed /etc/default/rpi-eeprom-update -i -e "s/^FIRMWARE_RELEASE_STATUS.*/FIRMWARE_RELEASE_STATUS=\"latest\"/"
+        fi
         cat > /etc/apt/sources.list.d/beta.list << EOF
 deb http://archive.raspberrypi.com/debian/ $DVER beta
 #deb-src http://archive.raspberrypi.com/debian/ $DVER beta
@@ -4114,7 +4108,7 @@ do_internationalisation_menu() {
 }
 
 do_advanced_menu() {
-  if gpu_has_mmu ; then
+  if is_pifive ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
       "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
       "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
@@ -4128,11 +4122,25 @@ do_advanced_menu() {
       "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
       "A11 Shutdown Behaviour" "Configure shutdown behavior" \
       3>&1 1>&2 2>&3)
+  elif is_pifour ; then
+    FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
+      "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
+      "A3 Network Proxy Settings" "Configure network proxy settings" \
+      "A4 Boot Order" "Choose boot device priority (SD/net/USB/NVMe)" \
+      "A5 Beta Access" "Select beta or release software repository" \
+      "A6 Wayland" "Switch between X and Wayland backends" \
+      "A7 Audio Config" "Set audio control system" \
+      "A9 Network Install UI" "Select display of bootloader network install UI" \
+      "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
+      "A11 Shutdown Behaviour" "Configure shutdown behavior" \
+      3>&1 1>&2 2>&3)
   elif is_pi ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
       "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
       "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
       "A3 Network Proxy Settings" "Configure network proxy settings" \
+      "A5 Beta Access" "Select beta or release software repository" \
       "A6 Wayland" "Switch between X and Wayland backends" \
       "A7 Audio Config" "Set audio control system" \
       "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
