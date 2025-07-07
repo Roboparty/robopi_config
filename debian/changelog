@@ -1,3 +1,10 @@
+raspi-config (20250707) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Restore gpu_has_mmu function
+
+ -- Simon Long <simon@raspberrypi.com>  Mon, 07 Jul 2025 11:45:13 +0100
+
 raspi-config (20250703) bookworm; urgency=medium
 
   [ Simon Long ]

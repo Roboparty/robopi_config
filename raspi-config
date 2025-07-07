@@ -123,6 +123,14 @@ get_pi_type() {
   fi
 }
 
+gpu_has_mmu() {
+  if is_pifour || is_pifive ; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 is_live() {
   grep -q "boot=live" $CMDLINE
   return $?
