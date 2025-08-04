@@ -2805,18 +2805,10 @@ do_glamor() {
 
 do_wayland() {
   if [ "$INTERACTIVE" = True ]; then
-    if [ -f /usr/bin/labwc ]; then
-      RET=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Wayland Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
-          "W1 X11" "Openbox window manager with X11 backend" \
-          "W2 Wayfire" "Wayfire window manager with Wayland backend" \
-          "W3 Labwc" "Labwc window manager with Wayland backend" \
-          3>&1 1>&2 2>&3)
-    else
-      RET=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Wayland Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
-          "W1 X11" "Openbox window manager with X11 backend" \
-          "W2 Wayfire" "Wayfire window manager with Wayland backend" \
-          3>&1 1>&2 2>&3)
-    fi
+    RET=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Wayland Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+        "W1 X11" "Openbox window manager with X11 backend" \
+        "W2 Labwc" "Labwc window manager with Wayland backend" \
+        3>&1 1>&2 2>&3)
   else
     RET=$1
     true
@@ -2847,18 +2839,6 @@ do_wayland() {
         STATUS="Openbox on X11"
         ;;
       W2*)
-        sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?user-session.*/user-session=LXDE-pi-wayfire/"
-        sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?autologin-session.*/autologin-session=LXDE-pi-wayfire/"
-        sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?greeter-session.*/greeter-session=pi-greeter-wayfire/"
-        sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?fallback-test.*/fallback-test=\/usr\/bin\/xfallback.sh/"
-        sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?fallback-session.*/fallback-session=LXDE-pi-x/"
-        sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?fallback-greeter.*/fallback-greeter=pi-greeter/"
-        if [ -e "/var/lib/AccountsService/users/$USER" ] ; then
-          sed "/var/lib/AccountsService/users/$USER" -i -e "s/XSession=.*/XSession=LXDE-pi-wayfire/"
-        fi
-        STATUS="Wayfire on Wayland"
-        ;;
-      W3*)
         sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?user-session.*/user-session=$WSESSION/"
         sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?autologin-session.*/autologin-session=$WSESSION/"
         sed /etc/lightdm/lightdm.conf -i -e "s/^#\\?greeter-session.*/greeter-session=$WGSESSION/"
