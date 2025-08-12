@@ -1,3 +1,10 @@
+raspi-config (20250812) trixie; urgency=medium
+
+  [ Simon Long ]
+  * Bump version to be greater than on bookworm
+
+ -- Simon Long <simon@raspberrypi.com>  Tue, 12 Aug 2025 14:20:04 +0100
+
 raspi-config (20250804) trixie; urgency=medium
 
   [ Simon Long ]
