@@ -1,3 +1,10 @@
+raspi-config (20250813) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Correct order of items in advanced menu
+
+ -- Simon Long <simon@raspberrypi.com>  Wed, 13 Aug 2025 09:01:32 +0100
+
 raspi-config (20250805) bookworm; urgency=medium
 
   [ Simon Long ]
