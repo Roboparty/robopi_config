@@ -1,3 +1,13 @@
+raspi-config (20250819) trixie; urgency=medium
+
+  * d/c: fix Vcs-Git URL
+  * d/c: Remove triggerhappy from Recommends
+  * d/gbp.conf: update debian branch
+  * d/c: Add versioned debhelper prerequisite
+  * d/: remove obsolete maintainer scripts
+
+ -- Serge Schneider <serge@raspberrypi.com>  Tue, 19 Aug 2025 10:08:02 +0100
+
 raspi-config (20250814) trixie; urgency=medium
 
   [ Simon Long ]
