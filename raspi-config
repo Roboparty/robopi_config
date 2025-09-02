@@ -2464,48 +2464,6 @@ do_boot_splash() {
   fi
 }
 
-get_rgpio() {
-  if test -e /etc/systemd/system/pigpiod.service.d/public.conf; then
-    echo 0
-  else
-    echo 1
-  fi
-}
-
-do_rgpio() {
-  DEFAULT=--defaultno
-  if [ $(get_rgpio) -eq 0 ]; then
-    DEFAULT=
-  fi
-  if [ "$INTERACTIVE" = True ]; then
-    whiptail --yesno "Would you like the GPIO server to be accessible over the network?" $DEFAULT 20 60 2
-    RET=$?
-  else
-    RET=$1
-  fi
-  if [ $RET -eq 0 ]; then
-    mkdir -p /etc/systemd/system/pigpiod.service.d/
-    cat > /etc/systemd/system/pigpiod.service.d/public.conf << EOF
-[Service]
-ExecStart=
-ExecStart=/usr/bin/pigpiod
-EOF
-    STATUS=enabled
-  elif [ $RET -eq 1 ]; then
-    rm -f /etc/systemd/system/pigpiod.service.d/public.conf
-    STATUS=disabled
-  else
-    return $RET
-  fi
-  systemctl daemon-reload
-  if systemctl -q is-enabled pigpiod ; then
-    systemctl restart pigpiod
-  fi
-  if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "Remote access to the GPIO server is $STATUS" 20 60 1
-  fi
-}
-
 get_camera() {
   if [ $(deb_ver) -le 10 ]; then
     CAM=$(get_config_var start_x $CONFIG)
@@ -4017,7 +3975,6 @@ do_interface_menu() {
       "I5 I2C" "Enable/disable automatic loading of I2C kernel module" \
       "I6 Serial Port" "Enable/disable shell messages on the serial connection" \
       "I7 1-Wire" "Enable/disable one-wire interface" \
-      "I8 Remote GPIO" "Enable/disable remote access to GPIO pins" \
       3>&1 1>&2 2>&3)
   else
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Interfacing Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -4036,7 +3993,6 @@ do_interface_menu() {
       I5\ *) do_i2c ;;
       I6\ *) if is_pifive ; then do_serial_pi5 ; else do_serial ; fi ;;
       I7\ *) do_onewire ;;
-      I8\ *) do_rgpio ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
