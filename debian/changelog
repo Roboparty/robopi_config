@@ -1,3 +1,13 @@
+raspi-config (20250902) trixie; urgency=medium
+
+  [ Richard Oliver]
+  * Change location of journal file
+
+  [ Simon Long]
+  * Remove remote GPIO option
+
+ -- Simon Long <simon@raspberrypi.com>  Tue, 02 Sep 2025 10:15:57 +0100
+
 raspi-config (20250819) trixie; urgency=medium
 
   * d/c: fix Vcs-Git URL
