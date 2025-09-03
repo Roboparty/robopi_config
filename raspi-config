@@ -882,7 +882,7 @@ get_wifi_country() {
 
 do_wifi_country() {
   if [ "$INTERACTIVE" = True ]; then
-    value=$(sed '/^#/d' /usr/share/zoneinfo/iso3166.tab | tr '\t\n' '/')
+    value=$(hexdump -C /lib/firmware/regulatory.db | grep -oE '[A-Z]{2}' | sort -u | sed 's/^/^/;s/$/\t/' | grep -f- /usr/share/zoneinfo/iso3166.tab | tr '\t\n' '/')
     oIFS="$IFS"
     IFS="/"
     #shellcheck disable=2086
