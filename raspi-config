@@ -3316,6 +3316,69 @@ do_wifi_ssid_passphrase() {
   return "$RET"
 }
 
+get_wifi_power_save() {
+  # Check if the configuration file exists (simpler approach)
+  if [ -f /etc/NetworkManager/conf.d/default-wifi-powersave-off.conf ]; then
+    echo 0  # Power saving is disabled
+  else
+    echo 1  # Power saving is enabled (default)
+  fi
+}
+
+# shellcheck disable=SC2120
+do_wifi_power_save() {
+  DEFAULT=
+  CURRENT=0
+  if [ "$(get_wifi_power_save)" -eq 0 ]; then
+    DEFAULT=--defaultno
+    CURRENT=1
+  fi
+
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like to enable WLAN power saving?\n\nNote: Disabling power saving may improve connection stability but increase power consumption." $DEFAULT 20 70 2
+    RET=$?
+  else
+    RET=$1
+  fi
+
+  # Create NetworkManager conf.d directory if it doesn't exist
+  mkdir -p /etc/NetworkManager/conf.d
+
+  if [ "$RET" -eq 0 ]; then
+    # Enable power saving - remove the configuration file
+    rm -f /etc/NetworkManager/conf.d/default-wifi-powersave-off.conf
+    STATUS="enabled"
+  elif [ "$RET" -eq 1 ]; then
+    # Disable power saving - create configuration file
+    cat > /etc/NetworkManager/conf.d/default-wifi-powersave-off.conf << EOF
+[connection]
+wifi.powersave = 2
+EOF
+    STATUS="disabled"
+  else
+    return "$RET"
+  fi
+
+  # Reload NetworkManager configuration for persistence
+  if systemctl -q is-active NetworkManager; then
+    systemctl reload NetworkManager 2>/dev/null || true
+  fi
+
+  # Apply the change immediately to current interface
+  IFACE="$(list_wlan_interfaces | head -n 1)"
+  if [ -n "$IFACE" ] && command -v iw >/dev/null 2>&1; then
+    if [ "$RET" -eq 0 ]; then
+      iw dev "$IFACE" set power_save on 2>/dev/null || true
+    else
+      iw dev "$IFACE" set power_save off 2>/dev/null || true
+    fi
+  fi
+
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "WLAN power saving is $STATUS\n\nThe change has been applied immediately and made persistent for future connections." 20 75 1
+  fi
+}
+
 do_finish() {
   disable_raspi_config_at_boot
   if [ $ASK_TO_REBOOT -eq 1 ]; then
@@ -4090,6 +4153,7 @@ do_advanced_menu() {
       "A11 Libliftoff" "Enable/disable libliftoff hardware overlays" \
       "A12 Shutdown Behaviour" "Configure shutdown behavior" \
       "A13 Logging" "Set storage location for logs" \
+      "A14 WLAN Power Save" "Enable/disable WLAN power saving" \
       3>&1 1>&2 2>&3)
   elif is_pifour ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -4105,6 +4169,7 @@ do_advanced_menu() {
       "A11 Libliftoff" "Enable/disable libliftoff hardware overlays" \
       "A12 Shutdown Behaviour" "Configure shutdown behavior" \
       "A13 Logging" "Set storage location for logs" \
+      "A14 WLAN Power Save" "Enable/disable WLAN power saving" \
       3>&1 1>&2 2>&3)
   elif is_pi ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -4116,6 +4181,7 @@ do_advanced_menu() {
       "A8 Audio Config" "Set audio control system" \
       "A11 Libliftoff" "Enable/disable libliftoff hardware overlays" \
       "A13 Logging" "Set storage location for logs" \
+      "A14 WLAN Power Save" "Enable/disable WLAN power saving" \
       3>&1 1>&2 2>&3)
   else
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -4126,6 +4192,7 @@ do_advanced_menu() {
       "A8 Audio Config" "Set audio control system" \
       "A11 Libliftoff" "Enable/disable libliftoff hardware overlays" \
       "A13 Logging" "Set storage location for logs" \
+      "A14 WLAN Power Save" "Enable/disable WLAN power saving" \
       3>&1 1>&2 2>&3)
   fi
   RET=$?
@@ -4146,6 +4213,7 @@ do_advanced_menu() {
       A11\ *) do_libliftoff ;;
       A12\ *) do_power_off_on_halt ;;
       A13\ *) do_journald_storage ;;
+      A14\ *) do_wifi_power_save ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
