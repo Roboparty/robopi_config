@@ -3379,6 +3379,62 @@ EOF
   fi
 }
 
+get_link_local_fallback() {
+  # Check if the configuration file exists
+  if [ -f /etc/NetworkManager/conf.d/link-local.conf ]; then
+    echo 1  # Link-local fallback is enabled
+  else
+    echo 0  # Link-local fallback is disabled (default)
+  fi
+}
+
+# shellcheck disable=SC2120
+do_link_local_fallback() {
+  DEFAULT=--defaultno
+  CURRENT=$(get_link_local_fallback)
+  if [ "$CURRENT" -eq 1 ]; then
+    DEFAULT=
+  fi
+
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like to enable link-local fallback?\n\nNote: This assigns a 169.254.x.x address immediately, before trying DHCP. Enable only if you understand this behavior." $DEFAULT 20 75 2
+    RET=$?
+  else
+    RET=$1
+  fi
+
+  if [ "$RET" -eq 0 ]; then
+    STATUS="enabled"
+  else
+    STATUS="disabled"
+  fi
+
+  # Only make changes if the setting is actually changing
+  if [ "$RET" -eq 0 ] && [ "$CURRENT" -eq 0 ]; then
+    # Enable link-local fallback
+    mkdir -p /etc/NetworkManager/conf.d
+    cat > /etc/NetworkManager/conf.d/link-local.conf << EOF
+# Created/managed by raspi-config
+[connection]
+ipv4.link-local=4
+EOF
+    ASK_TO_REBOOT=1
+  elif [ "$RET" -eq 1 ] && [ "$CURRENT" -eq 1 ]; then
+    # Disable link-local fallback
+    rm -f /etc/NetworkManager/conf.d/link-local.conf
+    ASK_TO_REBOOT=1
+  fi
+
+  # Reload NetworkManager configuration for persistence
+  if systemctl -q is-active NetworkManager; then
+    systemctl reload NetworkManager 2>/dev/null || true
+  fi
+
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "Link-local fallback is $STATUS" 20 60 1
+  fi
+}
+
 do_finish() {
   disable_raspi_config_at_boot
   if [ $ASK_TO_REBOOT -eq 1 ]; then
@@ -4154,6 +4210,7 @@ do_advanced_menu() {
       "A12 Shutdown Behaviour" "Configure shutdown behavior" \
       "A13 Logging" "Set storage location for logs" \
       "A14 WLAN Power Save" "Enable/disable WLAN power saving" \
+      "A15 Link-local Fallback" "Enable/disable link-local address fallback" \
       3>&1 1>&2 2>&3)
   elif is_pifour ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -4170,6 +4227,7 @@ do_advanced_menu() {
       "A12 Shutdown Behaviour" "Configure shutdown behavior" \
       "A13 Logging" "Set storage location for logs" \
       "A14 WLAN Power Save" "Enable/disable WLAN power saving" \
+      "A15 Link-local Fallback" "Enable/disable link-local address fallback" \
       3>&1 1>&2 2>&3)
   elif is_pi ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -4182,6 +4240,7 @@ do_advanced_menu() {
       "A11 Libliftoff" "Enable/disable libliftoff hardware overlays" \
       "A13 Logging" "Set storage location for logs" \
       "A14 WLAN Power Save" "Enable/disable WLAN power saving" \
+      "A15 Link-local Fallback" "Enable/disable link-local address fallback" \
       3>&1 1>&2 2>&3)
   else
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -4193,6 +4252,7 @@ do_advanced_menu() {
       "A11 Libliftoff" "Enable/disable libliftoff hardware overlays" \
       "A13 Logging" "Set storage location for logs" \
       "A14 WLAN Power Save" "Enable/disable WLAN power saving" \
+      "A15 Link-local Fallback" "Enable/disable link-local address fallback" \
       3>&1 1>&2 2>&3)
   fi
   RET=$?
@@ -4214,6 +4274,7 @@ do_advanced_menu() {
       A12\ *) do_power_off_on_halt ;;
       A13\ *) do_journald_storage ;;
       A14\ *) do_wifi_power_save ;;
+      A15\ *) do_link_local_fallback ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
