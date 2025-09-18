@@ -1,3 +1,15 @@
+raspi-config (20250918) trixie; urgency=medium
+
+  [ Serge Schneider ]
+  * Improve WLAN regulatory domain code list
+  * Add WLAN power saving toggle to Advanced Options
+  * Add link-local toggle
+
+  [ XhmikosR ]
+  * Fix typo in network boot option description (#285)
+
+ -- Serge Schneider <serge@raspberrypi.com>  Thu, 18 Sep 2025 15:32:39 +0100
+
 raspi-config (20250902) trixie; urgency=medium
 
   [ Richard Oliver]
