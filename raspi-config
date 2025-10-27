@@ -1965,6 +1965,10 @@ do_boot_target(){
 }
 
 do_autologin(){
+  if [ -z "$USER" ]; then
+    echo "Can't configure autologin: USER unset" >&2
+    return 0
+  fi
   if [ "$INTERACTIVE" = True ]; then
     whiptail --yesno "Would you like to automatically log in to the console?" $DEFAULT 20 60 2
     RET=$?
@@ -2062,6 +2066,10 @@ do_boot_behaviour() {
         fi
         ;;
       B2*|B4*) # Autologin enabled
+        if [ -z "$USER" ]; then
+          echo "Can't configure autologin: USER unset" >&2
+          return 0
+        fi
         if [ -z "${BOOTOPT%%B4*}" ]; then
           sed /etc/lightdm/lightdm.conf -i -e "s/^\(#\|\)autologin-user=.*/autologin-user=$USER/"
         fi
