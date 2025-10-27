@@ -1,3 +1,9 @@
+raspi-config (20251027) trixie; urgency=medium
+
+  * Prevent invalid autologin settings
+
+ -- Serge Schneider <serge@raspberrypi.com>  Mon, 27 Oct 2025 14:42:01 +0000
+
 raspi-config (20250918) trixie; urgency=medium
 
   [ Serge Schneider ]
