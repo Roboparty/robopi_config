@@ -9,7 +9,7 @@ Vcs-Browser: https://github.com/RPi-Distro/raspi-config
 
 Package: raspi-config
 Architecture: all
-Depends: ${misc:Depends}, whiptail, parted, lua5.1, alsa-utils, psmisc,
+Depends: ${misc:Depends}, whiptail, parted, alsa-utils, psmisc,
  raspi-utils, dconf-cli, bsdextrautils
 Recommends: iw
 Description: Raspberry Pi configuration tool
