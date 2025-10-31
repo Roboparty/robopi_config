@@ -4,7 +4,7 @@
 # See LICENSE file for copyright and license details
 # shellcheck disable=SC2120
 
-INTERACTIVE=True
+INTERACTIVE="${INTERACTIVE:-True}"
 ASK_TO_REBOOT=0
 BLACKLIST=/etc/modprobe.d/raspi-blacklist.conf
 
@@ -918,10 +918,14 @@ do_wifi_country() {
 }
 
 get_hostname() {
-  tr -d " \t\n\r" < /etc/hostname
+  HOSTNAME_FILE="${MOCK_HOSTNAME_FILE:-/etc/hostname}"
+  tr -d " \t\n\r" < "$HOSTNAME_FILE"
 }
 
 do_hostname() {
+  HOSTNAME_FILE="${MOCK_HOSTNAME_FILE:-/etc/hostname}"
+  HOSTS_FILE="${MOCK_HOSTS_FILE:-/etc/hosts}"
+
   if [ "$INTERACTIVE" = True ]; then
     whiptail --msgbox "\
 Please note: RFCs mandate that a hostname's labels \
@@ -934,18 +938,23 @@ No other symbols, punctuation characters, or blank spaces are permitted.\
   CURRENT_HOSTNAME=$(get_hostname)
   if [ "$INTERACTIVE" = True ]; then
     NEW_HOSTNAME=$(whiptail --inputbox "Please enter a hostname" 20 60 "$CURRENT_HOSTNAME" 3>&1 1>&2 2>&3)
+    RET=$?
   else
     NEW_HOSTNAME="$1"
-    true
+    RET=0
   fi
-  if [ $? -eq 0 ]; then
+  if [ $RET -eq 0 ]; then
     if [ "$INIT" = "systemd" ] && systemctl -q is-active dbus && ! ischroot; then
-      hostnamectl set-hostname "$NEW_HOSTNAME" 2> /dev/null
+      hostnamectl hostname "$NEW_HOSTNAME" 2> /dev/null
     else
-      echo "$NEW_HOSTNAME" > /etc/hostname
+      echo "$NEW_HOSTNAME" > "$HOSTNAME_FILE"
     fi
-    sed -i "s/127\.0\.1\.1.*$CURRENT_HOSTNAME/127.0.1.1\t$NEW_HOSTNAME/g" /etc/hosts
-    ASK_TO_REBOOT=1
+    if [ -f "$HOSTS_FILE" ]; then
+      sed -i "s/^[[:space:]]*127\.0\.1\.1[[:space:]].*/127.0.1.1\t$NEW_HOSTNAME/" "$HOSTS_FILE"
+    fi
+    if [ "$CURRENT_HOSTNAME" != "$NEW_HOSTNAME" ]; then
+      ASK_TO_REBOOT=1
+    fi
   fi
 }
 
