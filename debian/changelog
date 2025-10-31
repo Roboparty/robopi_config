@@ -1,3 +1,11 @@
+raspi-config (20251031) trixie; urgency=medium
+
+  * Disable SC2120 false positives from nonint support
+  * Remove lua dependency. Awk comes for free and won't require
+    maintenance between versions.
+
+ -- Serge Schneider <serge@raspberrypi.com>  Fri, 31 Oct 2025 14:31:25 +0000
+
 raspi-config (20251027) trixie; urgency=medium
 
   * Prevent invalid autologin settings
