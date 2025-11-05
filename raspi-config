@@ -2849,7 +2849,7 @@ get_net_names() {
 do_net_names () {
   DEFAULT=--defaultno
   CURRENT=0
-  if [ $(get_net_names) -eq 0 ]; then
+  if [ "$(get_net_names)" -eq 0 ]; then
     DEFAULT=
     CURRENT=1
   fi
@@ -2859,20 +2859,20 @@ do_net_names () {
   else
     RET=$1
   fi
-  if [ $RET -eq $CURRENT ]; then
+  if [ "$RET" -eq $CURRENT ]; then
     ASK_TO_REBOOT=1
   fi
-  if [ $RET -eq 0 ]; then
-    sed -i $CMDLINE -e "s/net.ifnames=0 *//"
+  if [ "$RET" -eq 0 ]; then
+    sed -i "$CMDLINE" -e "s/net.ifnames=0 *//"
     rm -f /etc/systemd/network/99-default.link
     rm -f /etc/systemd/network/73-usb-net-by-mac.link
     STATUS=enabled
-  elif [ $RET -eq 1 ]; then
+  elif [ "$RET" -eq 1 ]; then
     ln -sf /dev/null /etc/systemd/network/99-default.link
     ln -sf /dev/null /etc/systemd/network/73-usb-net-by-mac.link
     STATUS=disabled
   else
-    return $RET
+    return "$RET"
   fi
   if [ "$INTERACTIVE" = True ]; then
     whiptail --msgbox "Predictable network interface names are $STATUS" 20 60 1
