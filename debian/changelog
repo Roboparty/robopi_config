@@ -1,3 +1,10 @@
+raspi-config (20251111) trixie; urgency=medium
+
+  [ Simon Long ]
+  * Remove pulsaudio switch
+
+ -- Simon Long <simon@raspberrypi.com>  Tue, 11 Nov 2025 14:38:39 +0000
+
 raspi-config (20251031) trixie; urgency=medium
 
   * Disable SC2120 false positives from nonint support
