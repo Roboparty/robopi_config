@@ -944,9 +944,10 @@ No other symbols, punctuation characters, or blank spaces are permitted.\
     RET=0
   fi
   if [ $RET -eq 0 ]; then
-    if [ "$INIT" = "systemd" ] && systemctl -q is-active dbus && ! ischroot; then
-      hostnamectl hostname "$NEW_HOSTNAME" 2> /dev/null
-    else
+    if [ "$INIT" != "systemd" ] || \
+       ! systemctl -q is-active dbus || \
+       ischroot || \
+       ! hostnamectl hostname "$NEW_HOSTNAME" 2> /dev/null; then
       echo "$NEW_HOSTNAME" > "$HOSTNAME_FILE"
     fi
     if [ -f "$HOSTS_FILE" ]; then
