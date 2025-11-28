@@ -919,7 +919,8 @@ do_wifi_country() {
 
 get_hostname() {
   HOSTNAME_FILE="${MOCK_HOSTNAME_FILE:-/etc/hostname}"
-  tr -d " \t\n\r" < "$HOSTNAME_FILE"
+  # skip comments and empty lines, return first valid hostname with whitespace stripped
+  grep -v '^[[:space:]]*\(#\|$\)' "$HOSTNAME_FILE" | head -n1 | xargs
 }
 
 do_hostname() {
