@@ -12,5 +12,10 @@
 override_dh_installinit:
 	dh_installinit --no-start
 
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	cd tests && ./run_all_tests.sh
+endif
+
 %:
 	dh $@ 
