@@ -1,3 +1,21 @@
+raspi-config (20251202) trixie; urgency=medium
+
+  [ David Vasquez ]
+  * Fix missspelling to Network Install UI (#289)
+
+  [ Serge Schneider ]
+  * Improve do_hostname
+  * Replace raspi-utils dependency with just raspi-utils-core
+  * Fix shellcheck warnings in do_net_names
+  * Fallback to editing /etc/hostname if hostnamectl fails
+  * Allow comments and empty lines in hostname file and only read the
+    first valid line
+  * Add unit tests for hostname functions
+  * Add raspi-config-core package
+  * Update SSH functions
+
+ -- Serge Schneider <serge@raspberrypi.com>  Tue, 02 Dec 2025 14:13:16 +0000
+
 raspi-config (20251111) trixie; urgency=medium
 
   [ Simon Long ]
