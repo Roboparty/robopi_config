@@ -3848,9 +3848,12 @@ do_squeek_output() {
 get_sudo_pass() {
   PSFILE="/etc/sudoers.d/010_$USER-nopasswd"
   GPSFILE="/etc/sudoers.d/010_pi-nopasswd"
+  CIFILE="/etc/sudoers.d/90-cloud-init-users"
   if [ -e $PSFILE ] ; then
     echo 0
   elif [ -e $GPSFILE ] && grep -q $USER $GPSFILE ; then
+    echo 0
+  elif [ -e $CIFILE ] && grep -q $USER $CIFILE ; then
     echo 0
   else
     echo 1
@@ -3860,6 +3863,7 @@ get_sudo_pass() {
 do_sudo_pass() {
   PSFILE="/etc/sudoers.d/010_$USER-nopasswd"
   GPSFILE="/etc/sudoers.d/010_pi-nopasswd"
+  CIFILE="/etc/sudoers.d/90-cloud-init-users"
   DEFAULT=--defaultno
   if [ "$(get_sudo_pass)" -eq 0 ]; then
     DEFAULT=
@@ -3874,6 +3878,7 @@ do_sudo_pass() {
   fi
   if [ "$RET" -eq 0 ]; then
     if [ -e $GPSFILE ] ; then rm $GPSFILE ; fi
+    if [ -e $CIFILE ] ; then rm $CIFILE ; fi
       cat > $PSFILE << EOF
 $USER ALL=(ALL) NOPASSWD: ALL
 EOF
@@ -3881,6 +3886,7 @@ EOF
   elif [ "$RET" -eq 1 ]; then
     if [ -e $PSFILE ] ; then rm $PSFILE ; fi
     if [ -e $GPSFILE ] ; then rm $GPSFILE ; fi
+    if [ -e $CIFILE ] ; then rm $CIFILE ; fi
     STATUS=disabled
   else
     return "$RET"
