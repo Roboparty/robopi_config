@@ -3845,6 +3845,51 @@ do_squeek_output() {
   fi
 }
 
+get_sudo_pass() {
+  PSFILE="/etc/sudoers.d/010_$USER-nopasswd"
+  GPSFILE="/etc/sudoers.d/010_pi-nopasswd"
+  if [ -e $PSFILE ] ; then
+    echo 0
+  elif [ -e $GPSFILE ] && grep -q $USER $GPSFILE ; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_sudo_pass() {
+  PSFILE="/etc/sudoers.d/010_$USER-nopasswd"
+  GPSFILE="/etc/sudoers.d/010_pi-nopasswd"
+  DEFAULT=--defaultno
+  if [ "$(get_sudo_pass)" -eq 0 ]; then
+    DEFAULT=
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno \
+      "Would you like passwordless sudo to be enabled?" \
+      $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ "$RET" -eq 0 ]; then
+    if [ -e $GPSFILE ] ; then rm $GPSFILE ; fi
+      cat > $PSFILE << EOF
+$USER ALL=(ALL) NOPASSWD: ALL
+EOF
+    STATUS=enabled
+  elif [ "$RET" -eq 1 ]; then
+    if [ -e $PSFILE ] ; then rm $PSFILE ; fi
+    if [ -e $GPSFILE ] ; then rm $GPSFILE ; fi
+    STATUS=disabled
+  else
+    return "$RET"
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "Passwordless sudo is $STATUS" 20 60 1
+  fi
+}
+
 nonint() {
   "$@"
 }
@@ -3919,6 +3964,7 @@ do_system_menu() {
       "S7 Splash Screen" "Choose graphical splash screen or text boot" \
       "S8 Power LED" "Set behaviour of power LED" \
       "S9 Browser" "Choose default web browser" \
+      "S10 Passwordless Sudo" "Choose whether sudo requires a password" \
       3>&1 1>&2 2>&3)
   elif is_live ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "System Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -3936,6 +3982,7 @@ do_system_menu() {
       "S5 Boot" "Select boot into desktop or to command line" \
       "S6 Auto Login" "Enable auto login to desktop or to command line" \
       "S7 Splash Screen" "Choose graphical splash screen or text boot" \
+      "S10 Passwordless Sudo" "Choose whether sudo requires a password" \
       3>&1 1>&2 2>&3)
   fi
   RET=$?
@@ -3952,6 +3999,7 @@ do_system_menu() {
       S7\ *) do_boot_splash ;;
       S8\ *) do_leds ;;
       S9\ *) do_browser ;;
+      S10\ *) do_sudo_pass ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
