@@ -3846,14 +3846,7 @@ do_squeek_output() {
 }
 
 get_sudo_pass() {
-  PSFILE="/etc/sudoers.d/010_$USER-nopasswd"
-  GPSFILE="/etc/sudoers.d/010_pi-nopasswd"
-  CIFILE="/etc/sudoers.d/90-cloud-init-users"
-  if [ -e $PSFILE ] ; then
-    echo 1
-  elif [ -e $GPSFILE ] && grep -q $USER $GPSFILE ; then
-    echo 1
-  elif [ -e $CIFILE ] && grep -q $USER $CIFILE ; then
+  if sudo -l -n -U $USER 2> /dev/null | grep -q "(ALL) NOPASSWD: ALL" 2> /dev/null ; then
     echo 1
   else
     echo 0
