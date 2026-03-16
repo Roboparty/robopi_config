@@ -57,7 +57,7 @@ else
   CMDLINE=/proc/cmdline
 fi
 
-# tests for Pi 1, 2 and 0 all test for specific boards...
+# tests for Pi 1, 2, 0, CM5, 500 and x00 all test for specific boards...
 
 is_pione() {
   if grep -q "^Revision\s*:\s*00[0-9a-fA-F][0-9a-fA-F]$" /proc/cpuinfo; then
@@ -79,7 +79,22 @@ is_pizero() {
   return $?
 }
 
-# ...while tests for Pi 3 and 4 just test processor type, so will also find CM3, CM4, Zero 2 etc.
+is_cmfive() {
+  grep -q "^Revision\s*:\s*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]1[8aA][0-9a-fA-F]$" /proc/cpuinfo
+  return $?
+}
+
+is_pi500() {
+  grep -q "^Revision\s*:\s*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]19[0-9a-fA-F]$" /proc/cpuinfo
+  return $?
+}
+
+is_pihundred() {
+  grep -q "^Revision\s*:\s*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]1[39][0-9a-fA-F]$" /proc/cpuinfo
+  return $?
+}
+
+# ...while tests for Pi 3, 4 and 5 just test processor type, so will also find CM3, CM4, Zero 2, 500, etc.
 
 is_pithree() {
   grep -q "^Revision\s*:\s*[ 123][0-9a-fA-F][0-9a-fA-F]2[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]$" /proc/cpuinfo
@@ -93,16 +108,6 @@ is_pifour() {
 
 is_pifive() {
   grep -q "^Revision\s*:\s*[ 123][0-9a-fA-F][0-9a-fA-F]4[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]$" /proc/cpuinfo
-  return $?
-}
-
-is_cmfive() {
-  grep -q "^Revision\s*:\s*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]1[8aA][0-9a-fA-F]$" /proc/cpuinfo
-  return $?
-}
-
-is_pi500() {
-  grep -q "^Revision\s*:\s*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]19[0-9a-fA-F]$" /proc/cpuinfo
   return $?
 }
 
@@ -179,6 +184,14 @@ has_analog() {
     return 0
   else
     return 1
+  fi
+}
+
+has_composite_video() {
+  if is_pihundred || is_cmfive; then
+    return 1
+  else
+    return 0
   fi
 }
 
@@ -1629,6 +1642,12 @@ get_composite() {
 }
 
 do_composite() {
+  if ! has_composite_video; then
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "This model of Raspberry Pi doesn't have composite video output" 20 60 1
+    fi
+    return 1
+  fi
   CURRENT=$(get_composite)
   DEFAULT=--defaultno
   if [ $CURRENT -eq 0 ]; then
