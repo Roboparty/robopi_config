@@ -2181,64 +2181,6 @@ do_network_install_ui() {
   fi
  }
 
-do_libliftoff() {
-  if [ "$INTERACTIVE" = True ]; then
-    RET=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "libliftoff Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
-        "L1 Disable" "Disable libliftoff hardware overlays" \
-        "L2 Enable" "Enable libliftoff hardware overlays" \
-        3>&1 1>&2 2>&3)
-  else
-    RET=$1
-    true
-  fi
-  if [ $? -eq 0 ]; then
-    case "$RET" in
-      L1*)
-        LIBLIFTOFF_ENABLED=0
-        STATUS="disabled"
-        ;;
-      L2*)
-        LIBLIFTOFF_ENABLED=1
-        STATUS="enabled"
-        ;;
-      *)
-        whiptail --msgbox "Programmer error, unrecognised libliftoff option" 20 60 2
-        return 1
-        ;;
-    esac
-
-    # Create the config dir and/or environment file, if needed
-    if [ -z $HOMEDIR ]; then
-      whiptail --msgbox "Unknown user home directory" 20 60 2
-      return 1
-    fi
-    LABWC_DIR="$HOMEDIR/.config/labwc"
-    if [ ! -e $LABWC_DIR ]; then
-      mkdir -p $LABWC_DIR
-      chown $USER:$USER $HOMEDIR/.config $LABWC_DIR
-    fi
-    if [ ! -e $LABWCENV_FILE ]; then
-      touch $LABWCENV_FILE
-      chown $USER:$USER $LABWCENV_FILE
-    fi
-
-    # If there is already a libliftoff line in the env file, replace it.
-    # Otherwise, add one.
-    if grep -q WLR_DRM_FORCE_LIBLIFTOFF $LABWCENV_FILE; then
-      sed -i "s/^.*WLR_DRM_FORCE_LIBLIFTOFF.*$/WLR_DRM_FORCE_LIBLIFTOFF=$LIBLIFTOFF_ENABLED/" $LABWCENV_FILE
-    else
-      echo "WLR_DRM_FORCE_LIBLIFTOFF=$LIBLIFTOFF_ENABLED" >>$LABWCENV_FILE
-    fi
-
-    ASK_TO_REBOOT=1
-  else
-    return 0
-  fi
-  if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "libliftoff is $STATUS" 20 60 1
-  fi
-}
-
 # shellcheck disable=SC2120
 do_power_off_on_halt() {
   if [ "$INTERACTIVE" = True ]; then
@@ -4206,11 +4148,10 @@ do_advanced_menu() {
       "A7 Wayland" "Switch between X and Wayland backends" \
       "A8 PCIe Speed" "Set PCIe x1 port speed" \
       "A9 Network Install UI" "Select display of bootloader network install UI" \
-      "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
-      "A11 Shutdown Behaviour" "Configure shutdown behavior" \
-      "A12 Logging" "Set storage location for logs" \
-      "A13 WLAN Power Save" "Enable/disable WLAN power saving" \
-      "A14 Link-local Fallback" "Enable/disable link-local address fallback" \
+      "A10 Shutdown Behaviour" "Configure shutdown behavior" \
+      "A11 Logging" "Set storage location for logs" \
+      "A12 WLAN Power Save" "Enable/disable WLAN power saving" \
+      "A13 Link-local Fallback" "Enable/disable link-local address fallback" \
       3>&1 1>&2 2>&3)
   elif is_pifour ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -4222,11 +4163,10 @@ do_advanced_menu() {
       "A6 Beta Access" "Select beta or release software repository" \
       "A7 Wayland" "Switch between X and Wayland backends" \
       "A9 Network Install UI" "Select display of bootloader network install UI" \
-      "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
-      "A11 Shutdown Behaviour" "Configure shutdown behavior" \
-      "A12 Logging" "Set storage location for logs" \
-      "A13 WLAN Power Save" "Enable/disable WLAN power saving" \
-      "A14 Link-local Fallback" "Enable/disable link-local address fallback" \
+      "A10 Shutdown Behaviour" "Configure shutdown behavior" \
+      "A11 Logging" "Set storage location for logs" \
+      "A12 WLAN Power Save" "Enable/disable WLAN power saving" \
+      "A13 Link-local Fallback" "Enable/disable link-local address fallback" \
       3>&1 1>&2 2>&3)
   elif is_pi ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -4235,10 +4175,9 @@ do_advanced_menu() {
       "A3 Network Proxy Settings" "Configure network proxy settings" \
       "A6 Beta Access" "Select beta or release software repository" \
       "A7 Wayland" "Switch between X and Wayland backends" \
-      "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
-      "A12 Logging" "Set storage location for logs" \
-      "A13 WLAN Power Save" "Enable/disable WLAN power saving" \
-      "A14 Link-local Fallback" "Enable/disable link-local address fallback" \
+      "A11 Logging" "Set storage location for logs" \
+      "A12 WLAN Power Save" "Enable/disable WLAN power saving" \
+      "A13 Link-local Fallback" "Enable/disable link-local address fallback" \
       3>&1 1>&2 2>&3)
   else
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -4246,10 +4185,9 @@ do_advanced_menu() {
       "A3 Network Proxy Settings" "Configure network proxy settings" \
       "A6 Beta Access" "Select beta or release software repository" \
       "A7 Wayland" "Switch between X and Wayland backends" \
-      "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
-      "A12 Logging" "Set storage location for logs" \
-      "A13 WLAN Power Save" "Enable/disable WLAN power saving" \
-      "A14 Link-local Fallback" "Enable/disable link-local address fallback" \
+      "A11 Logging" "Set storage location for logs" \
+      "A12 WLAN Power Save" "Enable/disable WLAN power saving" \
+      "A13 Link-local Fallback" "Enable/disable link-local address fallback" \
       3>&1 1>&2 2>&3)
   fi
   RET=$?
@@ -4266,11 +4204,10 @@ do_advanced_menu() {
       A7\ *) do_wayland ;;
       A8\ *) do_pci ;;
       A9\ *) do_network_install_ui ;;
-      A10\ *) do_libliftoff ;;
-      A11\ *) do_power_off_on_halt ;;
-      A12\ *) do_journald_storage ;;
-      A13\ *) do_wifi_power_save ;;
-      A14\ *) do_link_local_fallback ;;
+      A10\ *) do_power_off_on_halt ;;
+      A11\ *) do_journald_storage ;;
+      A12\ *) do_wifi_power_save ;;
+      A13\ *) do_link_local_fallback ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
