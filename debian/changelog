@@ -1,3 +1,23 @@
+raspi-config (20260522) trixie; urgency=medium
+
+  [ Simon Long ]
+  * Better test for passwordless sudo
+
+  [ Andrew Scheller ]
+  * Update do_composite prompt for Pi5
+  * Inform users that composite video can't be configured on
+    Pi400/500/500+/CM5
+  * Inform users that case fan can't be configured on Pi400 (#302)
+  * Allow do_boot_order to enable NVMe boot on CM4 (#303)
+
+  [ David Turner ]
+  * Remove libliftoff advanced option
+
+  [ mathewb64 ]
+  * Add configuration for AB firmware updates (#298)
+
+ -- Serge Schneider <serge@raspberrypi.com>  Fri, 22 May 2026 16:46:37 +0100
+
 raspi-config (20260303) trixie; urgency=medium
 
   [ Simon Long ]
