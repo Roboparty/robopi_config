@@ -217,6 +217,14 @@ is_installed() {
   fi
 }
 
+get_installed() {
+  if is_installed $1; then
+    echo 1
+  else
+    echo 0
+  fi
+}
+
 deb_ver () {
   ver=$(cut -d . -f 1 < /etc/debian_version)
   echo $ver
@@ -3943,6 +3951,13 @@ nonint() {
   "$@"
 }
 
+batch() {
+  for cmd in "$@"
+  do
+    echo "$cmd" $($cmd)
+  done
+}
+
 #
 # Command line options for non-interactive use
 #
@@ -3970,7 +3985,7 @@ do
     do_apply_os_config
     exit $?
     ;;
-  nonint)
+  nonint | batch)
     INTERACTIVE=False
     #echo "$@"
     "$@"
