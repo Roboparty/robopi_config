@@ -2,6 +2,7 @@ raspi-config (20260710) trixie; urgency=medium
 
   [ Simon Long ]
   * Add non-interactive batch mode
+  * Remove wayfire support
 
  -- Simon Long <simon@raspberrypi.com>  Fri, 10 Jul 2026 10:43:05 +0100
 
