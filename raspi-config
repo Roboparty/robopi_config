@@ -1781,7 +1781,7 @@ do_fan() {
 }
 
 get_browser() {
-  echo $(update-alternatives --display x-www-browser | grep currently | cut -d " " -f 7 | cut -d / -f 4)
+  echo $(LC_ALL=C update-alternatives --display x-www-browser | grep currently | cut -d " " -f 7 | cut -d / -f 4)
 }
 
 do_browser() {
