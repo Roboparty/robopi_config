@@ -147,6 +147,14 @@ is_live() {
   return $?
 }
 
+get_is_live() {
+  if is_live; then
+    echo 1
+  else
+    echo 0
+  fi
+}
+
 is_ssh() {
   if pstree -p | grep -qE ".*sshd.*\($$\)"; then
     return 0
