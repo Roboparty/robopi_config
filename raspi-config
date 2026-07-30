@@ -2392,7 +2392,9 @@ get_boot_splash() {
       echo 1
     fi
   else
-    if grep -q "GRUB_CMDLINE_LINUX_DEFAULT.*splash" /etc/default/grub ; then
+    if is_live ; then
+      echo 0
+    elif grep -q "GRUB_CMDLINE_LINUX_DEFAULT.*splash" /etc/default/grub ; then
       echo 0
     else
       echo 1
