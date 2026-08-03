@@ -546,7 +546,12 @@ do_blanking() {
   else
     if [ "$INTERACTIVE" = True ]; then
       if [ "$(dpkg -l xscreensaver | tail -n 1 | cut -d ' ' -f 1)" = "ii" ]; then
-        whiptail --msgbox "Warning: xscreensaver is installed and may override robopi-config settings" 20 60 2
+        if whiptail --yesno "xscreensaver is installed and may override screen blanking settings.\n\nRemove xscreensaver now?" 12 55; then
+          apt-get purge -y xscreensaver 2>/dev/null
+          whiptail --msgbox "xscreensaver removed." 8 40
+        else
+          whiptail --msgbox "xscreensaver kept. Screen blanking may not work as expected." 8 55
+        fi
       fi
       whiptail --yesno "Would you like to enable screen blanking?" $DEFAULT 20 60 2
       RET=$?
@@ -575,11 +580,12 @@ do_blanking() {
 }
 
 do_change_pass() {
-  whiptail --yesno "Change password for user: $USER ?\n\nSelect Yes to continue, No to cancel." 10 60
+  local target_user="${SUDO_USER:-$USER}"
+  whiptail --yesno "Change password for user: ${target_user} ?\n\nSelect Yes to continue, No to cancel." 10 60
   if [ $? -ne 0 ]; then
     return 0  # User cancelled, not an error
   fi
-  passwd $USER && \
+  passwd "$target_user" && \
     whiptail --msgbox "Password changed successfully" 8 50
 }
 
@@ -3211,7 +3217,7 @@ do_wifi_ssid_passphrase() {
   if systemctl -q is-active NetworkManager; then
     # NetworkManager handles WiFi — use nmcli or nmtui
     nmtui connect
-    return $?
+    return 0
   elif systemctl -q is-active dhcpcd; then
     IFACE="$(list_wlan_interfaces | head -n 1)"
 
@@ -4057,22 +4063,24 @@ if [ -n "${OPT_MEMORY_SPLIT:-}" ]; then
 fi
 
 do_system_menu() {
-  FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "System Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-    "S1 WiFi"         "Connect to or disconnect from WiFi network" \
-    "S2 Password"     "Change password for the '$USER' user" \
-    "S3 Hostname"     "Set name for this computer on a network" \
-    "S4 Boot"         "Select boot into desktop or to command line" \
-    "S5 Auto Login"   "Enable auto login to desktop or to command line" \
-    "S6 CPU"          "Set CPU governor and frequency" \
-    "S7 Overlay FS"   "Enable/disable read-only root filesystem" \
-    "S8 SSH Config"   "Configure SSH daemon options" \
-    "S9 Firmware"     "Run apt update & apt upgrade" \
-    "S10 Admin Pass"  "Enable or disable sudo password" \
-    3>&1 1>&2 2>&3)
-  RET=$?
-  if [ $RET -eq 1 ]; then
-    return 0
-  elif [ $RET -eq 0 ]; then
+  local target_user="${SUDO_USER:-$USER}"
+  while true; do
+    FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "System Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "S1 WiFi"         "Connect to or disconnect from WiFi network" \
+      "S2 Password"     "Change password for the '${target_user}' user" \
+      "S3 Hostname"     "Set name for this computer on a network" \
+      "S4 Boot"         "Select boot into desktop or to command line" \
+      "S5 Auto Login"   "Enable auto login to desktop or to command line" \
+      "S6 CPU"          "Set CPU governor and frequency" \
+      "S7 Overlay FS"   "Enable/disable read-only root filesystem" \
+      "S8 SSH Config"   "Configure SSH daemon options" \
+      "S9 Firmware"     "Run apt update & apt upgrade" \
+      "S10 Admin Pass"  "Enable or disable sudo password" \
+      3>&1 1>&2 2>&3)
+    RET=$?
+    if [ $RET -ne 0 ]; then
+      return 0
+    fi
     case "$FUN" in
       S1\ *) do_wifi_ssid_passphrase ;;
       S2\ *) do_change_pass ;;
@@ -4085,46 +4093,48 @@ do_system_menu() {
       S9\ *) do_firmware ;;
       S10\ *) do_sudo_pass ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
-  fi
+    esac
+  done
 }
 
 do_display_menu() {
-  FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Display Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-    "D1 HDMI Status"  "Show HDMI/display connection status" \
-    "D2 Screen Blank" "Enable/disable screen blanking" \
-    "D3 Resolution"   "Set display resolution (X11/Wayland)" \
-    3>&1 1>&2 2>&3)
-  RET=$?
-  if [ $RET -eq 1 ]; then
-    return 0
-  elif [ $RET -eq 0 ]; then
+  while true; do
+    FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Display Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "D1 HDMI Status"  "Show HDMI/display connection status" \
+      "D2 Screen Blank" "Enable/disable screen blanking" \
+      "D3 Resolution"   "Set display resolution (X11/Wayland)" \
+      3>&1 1>&2 2>&3)
+    RET=$?
+    if [ $RET -ne 0 ]; then
+      return 0
+    fi
     case "$FUN" in
       D1\ *) do_hdmi_status ;;
       D2\ *) do_blanking ;;
       D3\ *) do_resolution_robopi ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
-  fi
+    esac
+  done
 }
 
 do_interface_menu() {
-  FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Interface Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-    "I0 Hardware" "Toggle device tree overlays (SPI, I2C, UART, PWM...)" \
-    "I1 SSH"      "Enable/disable SSH daemon" \
-    "I2 VNC"      "Enable/disable VNC remote desktop" \
-    3>&1 1>&2 2>&3)
-  RET=$?
-  if [ $RET -eq 1 ]; then
-    return 0
-  elif [ $RET -eq 0 ]; then
+  while true; do
+    FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Interface Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "I0 Hardware" "Toggle device tree overlays (SPI, I2C, UART, PWM...)" \
+      "I1 SSH"      "Enable/disable SSH daemon" \
+      "I2 VNC"      "Enable/disable VNC remote desktop" \
+      3>&1 1>&2 2>&3)
+    RET=$?
+    if [ $RET -ne 0 ]; then
+      return 0
+    fi
     case "$FUN" in
       I0\ *) do_hardware_overlays ;;
       I1\ *) do_ssh ;;
       I2\ *) do_vnc ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
-  fi
+    esac
+  done
 }
 
 do_performance_menu() {
@@ -4147,91 +4157,96 @@ do_performance_menu() {
 }
 
 do_internationalisation_menu() {
-  FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Localisation Options" $WT_HEIGHT $WT_WIDTH 2 --cancel-button Back --ok-button Select \
-    "L1 Locale" "Configure language and regional settings" \
-    "L2 Timezone" "Configure time zone" \
-    3>&1 1>&2 2>&3)
-  RET=$?
-  if [ $RET -eq 1 ]; then
-    return 0
-  elif [ $RET -eq 0 ]; then
+  while true; do
+    FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Localisation Options" $WT_HEIGHT $WT_WIDTH 2 --cancel-button Back --ok-button Select \
+      "L1 Locale" "Configure language and regional settings" \
+      "L2 Timezone" "Configure time zone" \
+      3>&1 1>&2 2>&3)
+    RET=$?
+    if [ $RET -ne 0 ]; then
+      return 0
+    fi
     case "$FUN" in
       L1\ *) do_change_locale ;;
       L2\ *) do_change_timezone ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
-  fi
+    esac
+  done
 }
 
 do_advanced_menu() {
-  if is_pifive ; then
-    FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-      "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
-      "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
-      "A3 Network Proxy Settings" "Configure network proxy settings" \
-      "A4 Boot Order" "Choose boot device priority (SD/net/USB/NVMe)" \
-      "A5 Bootloader Version" "Selects the latest or the factory default bootloader" \
-      "A6 Beta Access" "Select beta or release software repository" \
-      "A7 Wayland" "Switch between X and Wayland backends" \
-      "A8 PCIe Speed" "Set PCIe x1 port speed" \
-      "A9 Network Install UI" "Select display of bootloader network install UI" \
-      "A10 Shutdown Behaviour" "Configure shutdown behavior" \
-      "A11 Logging" "Set storage location for logs" \
-      "A12 WLAN Power Save" "Enable/disable WLAN power saving" \
-      "A13 Link-local Fallback" "Enable/disable link-local address fallback" \
-      "A14 AB Firmware" "Enable/disable AB firmware updates" \
-      3>&1 1>&2 2>&3)
-  elif is_pifour ; then
-    FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-      "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
-      "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
-      "A3 Network Proxy Settings" "Configure network proxy settings" \
-      "A4 Boot Order" "Choose boot device priority (SD/net/USB/NVMe)" \
-      "A5 Bootloader Version" "Selects the latest or the factory default bootloader" \
-      "A6 Beta Access" "Select beta or release software repository" \
-      "A7 Wayland" "Switch between X and Wayland backends" \
-      "A9 Network Install UI" "Select display of bootloader network install UI" \
-      "A10 Shutdown Behaviour" "Configure shutdown behavior" \
-      "A11 Logging" "Set storage location for logs" \
-      "A12 WLAN Power Save" "Enable/disable WLAN power saving" \
-      "A13 Link-local Fallback" "Enable/disable link-local address fallback" \
-      3>&1 1>&2 2>&3)
-  elif is_pi ; then
-    FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-      "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
-      "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
-      "A3 Network Proxy Settings" "Configure network proxy settings" \
-      "A6 Beta Access" "Select beta or release software repository" \
-      "A7 Wayland" "Switch between X and Wayland backends" \
-      "A11 Logging" "Set storage location for logs" \
-      "A12 WLAN Power Save" "Enable/disable WLAN power saving" \
-      "A13 Link-local Fallback" "Enable/disable link-local address fallback" \
-      3>&1 1>&2 2>&3)
-  else
-    FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-      "A1 Network Interface Names" "Enable/disable predictable network i/f names" \
-      "A2 Network Proxy Settings" "Configure network proxy settings" \
-      "A3 Beta Access" "Select beta or release software repository" \
-      "A4 Wayland" "Switch between X and Wayland backends" \
-      "A5 Logging" "Set storage location for logs" \
-      "A6 WLAN Power Save" "Enable/disable WLAN power saving" \
-      "A7 Link-local Fallback" "Enable/disable link-local address fallback" \
-      3>&1 1>&2 2>&3)
-    # Remap sequential tags to original case patterns shared with Pi branches
-    case "$FUN" in
-      A1\ *) FUN="A2 Network Interface Names" ;;
-      A2\ *) FUN="A3 Network Proxy Settings" ;;
-      A3\ *) FUN="A6 Beta Access" ;;
-      A4\ *) FUN="A7 Wayland" ;;
-      A5\ *) FUN="A11 Logging" ;;
-      A6\ *) FUN="A12 WLAN Power Save" ;;
-      A7\ *) FUN="A13 Link-local Fallback" ;;
-    esac
-  fi
-  RET=$?
-  if [ $RET -eq 1 ]; then
-    return 0
-  elif [ $RET -eq 0 ]; then
+  while true; do
+    if is_pifive ; then
+      FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+        "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
+        "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
+        "A3 Network Proxy Settings" "Configure network proxy settings" \
+        "A4 Boot Order" "Choose boot device priority (SD/net/USB/NVMe)" \
+        "A5 Bootloader Version" "Selects the latest or the factory default bootloader" \
+        "A6 Beta Access" "Select beta or release software repository" \
+        "A7 Wayland" "Switch between X and Wayland backends" \
+        "A8 PCIe Speed" "Set PCIe x1 port speed" \
+        "A9 Network Install UI" "Select display of bootloader network install UI" \
+        "A10 Shutdown Behaviour" "Configure shutdown behavior" \
+        "A11 Logging" "Set storage location for logs" \
+        "A12 WLAN Power Save" "Enable/disable WLAN power saving" \
+        "A13 Link-local Fallback" "Enable/disable link-local address fallback" \
+        "A14 AB Firmware" "Enable/disable AB firmware updates" \
+        3>&1 1>&2 2>&3)
+      RET=$?
+    elif is_pifour ; then
+      FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+        "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
+        "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
+        "A3 Network Proxy Settings" "Configure network proxy settings" \
+        "A4 Boot Order" "Choose boot device priority (SD/net/USB/NVMe)" \
+        "A5 Bootloader Version" "Selects the latest or the factory default bootloader" \
+        "A6 Beta Access" "Select beta or release software repository" \
+        "A7 Wayland" "Switch between X and Wayland backends" \
+        "A9 Network Install UI" "Select display of bootloader network install UI" \
+        "A10 Shutdown Behaviour" "Configure shutdown behavior" \
+        "A11 Logging" "Set storage location for logs" \
+        "A12 WLAN Power Save" "Enable/disable WLAN power saving" \
+        "A13 Link-local Fallback" "Enable/disable link-local address fallback" \
+        3>&1 1>&2 2>&3)
+      RET=$?
+    elif is_pi ; then
+      FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+        "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
+        "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
+        "A3 Network Proxy Settings" "Configure network proxy settings" \
+        "A6 Beta Access" "Select beta or release software repository" \
+        "A7 Wayland" "Switch between X and Wayland backends" \
+        "A11 Logging" "Set storage location for logs" \
+        "A12 WLAN Power Save" "Enable/disable WLAN power saving" \
+        "A13 Link-local Fallback" "Enable/disable link-local address fallback" \
+        3>&1 1>&2 2>&3)
+      RET=$?
+    else
+      FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+        "A1 Network Interface Names" "Enable/disable predictable network i/f names" \
+        "A2 Network Proxy Settings" "Configure network proxy settings" \
+        "A3 Beta Access" "Select beta or release software repository" \
+        "A4 Wayland" "Switch between X and Wayland backends" \
+        "A5 Logging" "Set storage location for logs" \
+        "A6 WLAN Power Save" "Enable/disable WLAN power saving" \
+        "A7 Link-local Fallback" "Enable/disable link-local address fallback" \
+        3>&1 1>&2 2>&3)
+      RET=$?
+      # Remap sequential tags to original case patterns shared with Pi branches
+      case "$FUN" in
+        A1\ *) FUN="A2 Network Interface Names" ;;
+        A2\ *) FUN="A3 Network Proxy Settings" ;;
+        A3\ *) FUN="A6 Beta Access" ;;
+        A4\ *) FUN="A7 Wayland" ;;
+        A5\ *) FUN="A11 Logging" ;;
+        A6\ *) FUN="A12 WLAN Power Save" ;;
+        A7\ *) FUN="A13 Link-local Fallback" ;;
+      esac
+    fi
+    if [ $RET -ne 0 ]; then
+      return 0
+    fi
     case "$FUN" in
       A1\ *) do_expand_rootfs ;;
       A2\ *) do_net_names ;;
@@ -4248,23 +4263,24 @@ do_advanced_menu() {
       A13\ *) do_link_local_fallback ;;
       A14\ *) do_ab_firmware ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
-  fi
+    esac
+  done
 }
 
 do_proxy_menu() {
-  FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Network Proxy Settings" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-    "P1 All" "Set the same proxy for all schemes" \
-    "P2 HTTP" "Set the HTTP proxy" \
-    "P3 HTTPS" "Set the HTTPS/SSL proxy" \
-    "P4 FTP" "Set the FTP proxy" \
-    "P5 RSYNC" "Set the RSYNC proxy" \
-    "P6 Exceptions" "Set addresses for which a proxy server should not be used" \
-    3>&1 1>&2 2>&3)
-  RET=$?
-  if [ $RET -eq 1 ]; then
-    return 0
-  elif [ $RET -eq 0 ]; then
+  while true; do
+    FUN=$(whiptail --title "RoboParty Configuration Tool (robopi-config)" --menu "Network Proxy Settings" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "P1 All" "Set the same proxy for all schemes" \
+      "P2 HTTP" "Set the HTTP proxy" \
+      "P3 HTTPS" "Set the HTTPS/SSL proxy" \
+      "P4 FTP" "Set the FTP proxy" \
+      "P5 RSYNC" "Set the RSYNC proxy" \
+      "P6 Exceptions" "Set addresses for which a proxy server should not be used" \
+      3>&1 1>&2 2>&3)
+    RET=$?
+    if [ $RET -ne 0 ]; then
+      return 0
+    fi
     case "$FUN" in
       P1\ *) do_proxy all ;;
       P2\ *) do_proxy http ;;
@@ -4273,8 +4289,8 @@ do_proxy_menu() {
       P5\ *) do_proxy rsync ;;
       P6\ *) do_proxy no;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
-  fi
+    esac
+  done
 }
 
 # ===== RoboParty Hardware Configuration Functions =====
@@ -4698,13 +4714,30 @@ do_hdmi_status() {
       local modes=""
       local modes_file="${conn_dir}/modes"
       if [ -f "$modes_file" ]; then
-        modes=$(head -5 "$modes_file" 2>/dev/null | tr '\n' ' ')
+        # Deduplicate: count each resolution, show ×N if >1 (different refresh rates)
+        modes=$(awk '
+          { cnt[$1]++ }
+          END {
+            for (m in cnt) {
+              if (cnt[m] > 1) print m " (x" cnt[m] ")"; else print m
+            }
+          }' "$modes_file" 2>/dev/null | sort -rn | tr '\n' ' ')
       fi
-      msg="${msg}Connector: ${name}\n  Status: ${state}\n  Modes: ${modes:-none}\n\n"
+      # Show active mode if connected
+      local active=""
+      if [ "$state" = "connected" ]; then
+        local enabled_file="${conn_dir}/enabled"
+        if [ -f "$enabled_file" ] && [ "$(cat "$enabled_file")" = "enabled" ]; then
+          if [ -f "$modes_file" ]; then
+            active=" [Current: $(head -1 "$modes_file")]"
+          fi
+        fi
+      fi
+      msg="${msg}Connector: ${name}\n  Status: ${state}${active}\n  Supported: ${modes:-none}\n\n"
     fi
   done
   [ -z "$msg" ] && msg="No DRM connectors found.\n\nTry: cat /sys/class/drm/*/status"
-  whiptail --msgbox "HDMI / Display Status:\n\n${msg}" 20 70
+  whiptail --msgbox "HDMI / Display Status:\n\n${msg}" 22 72
 }
 
 do_resolution_robopi() {
