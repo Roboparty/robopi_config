@@ -6,7 +6,7 @@ Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.3.0
 
 Package: robopi-config
-Architecture: all
+Architecture: arm64
 Depends: ${misc:Depends}, whiptail, parted, psmisc, bsdextrautils,
  ethtool, usbutils, iw, wireless-tools
 Recommends: can-utils, gpiod, adb
