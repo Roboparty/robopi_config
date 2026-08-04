@@ -1,27 +1,16 @@
-Source: raspi-config
+Source: robopi-config
 Section: utils
 Priority: optional
-Maintainer: Serge Schneider <serge@raspberrypi.com>
-Build-Depends: debhelper-compat (= 13), shunit2 <!nocheck>
+Maintainer: RoboParty <info@roboparty.com>
+Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.3.0
-Vcs-Git: https://github.com/RPi-Distro/raspi-config.git
-Vcs-Browser: https://github.com/RPi-Distro/raspi-config
 
-Package: raspi-config
+Package: robopi-config
 Architecture: all
-Depends: ${misc:Depends}, raspi-config-core, whiptail, parted, alsa-utils,
- psmisc, raspi-utils-core, dconf-cli, bsdextrautils
-Recommends: iw
-Description: Raspberry Pi configuration tool
- A simple configuration tool for common Raspberry Pi administrative tasks
-
-Package: raspi-config-core
-Architecture: all
-Depends: ${misc:Depends}
-Breaks: raspi-config (<< 20251202)
-Replaces: raspi-config (<< 20251202)
-Description: Raspberry Pi configuration tool (script only)
- A simple configuration tool for common Raspberry Pi administrative tasks
- .
- This package contains just the raspi-config script, intended for advanced,
- non-interactive use. This package does not install any of the depenencies.
+Depends: ${misc:Depends}, whiptail, parted, psmisc, bsdextrautils,
+ ethtool, usbutils, iw, wireless-tools
+Recommends: can-utils, gpiod, adb
+Description: RoboParty configuration tool
+ A simple configuration tool for RoboParty boards, including
+ hardware testing (WiFi, Ethernet, USB, CAN, ADB, Serial,
+ RS485, GPIO, HDMI) and system configuration.
