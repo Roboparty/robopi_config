@@ -1,0 +1,11 @@
+*.deb
+*.build
+*.buildinfo
+*.changes
+*.dsc
+*.tar.*
+*.pyc
+__pycache__/
+*~
+.*.swp
+debian/robopi-config/
