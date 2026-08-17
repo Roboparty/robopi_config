@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0
+# Copyright (C) 2025-2026 fanxiaobinggit
 # Test runner for raspi-config
 # Executes all test suites and reports results
 

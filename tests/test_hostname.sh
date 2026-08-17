@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0
+# Copyright (C) 2025-2026 fanxiaobinggit
 # Unit tests for raspi-config
 # shellcheck disable=SC1091
 

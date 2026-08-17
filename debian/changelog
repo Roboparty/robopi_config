@@ -1,4 +1,10 @@
-robopi-config (0.1.0) trixie; urgency=medium
+robopi-config (0.1.1-1) stable; urgency=medium
+
+  * update pwm test and led bottom test and new depend
+
+ -- wentywenty <2321901849@qq.com>  Mon, 17 Aug 2026 18:33:23 +0800
+
+robopi-config (0.1.0-1) stable; urgency=medium
 
   * Initial RoboParty release
   * Fork from raspi-config, adapted for RoboParty boards
@@ -7,4 +13,4 @@ robopi-config (0.1.0) trixie; urgency=medium
   * Removed Raspberry Pi specific hardware detection
   * Renamed to robopi-config
 
- -- wentywenty <2321901849@qq.com>  Tue, 29 Jul 2026 00:00:00 +0800
+ -- fanxiaobinggit <16692712013@163.com>  Tue, 29 Jul 2026 00:00:00 +0800

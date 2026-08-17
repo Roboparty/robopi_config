@@ -4,6 +4,9 @@
 # See LICENSE file for copyright and license details
 # shellcheck disable=SC2120
 
+# SPDX-License-Identifier: GPL-3.0
+# Copyright (C) 2025-2026 fanxiaobinggit
+
 INTERACTIVE="${INTERACTIVE:-True}"
 ASK_TO_REBOOT=0
 BLACKLIST=/etc/modprobe.d/robopi-blacklist.conf
@@ -193,6 +196,17 @@ you have heavily customised your installation.
 
 $(dpkg -s robopi-config 2> /dev/null | grep Version)\
 " 20 70 1
+  return 0
+}
+
+do_serial_number() {
+  local sn
+  sn=$(grep -i "^Serial" /proc/cpuinfo 2>/dev/null | awk '{print $3}')
+  if [ -z "$sn" ]; then
+    sn=$(tr -d '\0' < /proc/device-tree/serial-number 2>/dev/null)
+  fi
+  [ -z "$sn" ] && sn="Not available"
+  whiptail --msgbox "Serial Number:\n\n${sn}" 10 50
   return 0
 }
 
@@ -4076,6 +4090,7 @@ do_system_menu() {
       "S8 SSH Config"   "Configure SSH daemon options" \
       "S9 Firmware"     "Run apt update & apt upgrade" \
       "S10 Admin Pass"  "Enable or disable sudo password" \
+      "S11 Serial Number" "View board serial number (SN)" \
       3>&1 1>&2 2>&3)
     RET=$?
     if [ $RET -ne 0 ]; then
@@ -4092,6 +4107,7 @@ do_system_menu() {
       S8\ *) do_ssh_config ;;
       S9\ *) do_firmware ;;
       S10\ *) do_sudo_pass ;;
+      S11\ *) do_serial_number ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac
   done
