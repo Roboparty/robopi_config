@@ -1,0 +1,74 @@
+#!/bin/bash
+set -u
+
+WS2812_BIN=${WS2812_BIN:-roboparty-ws2812}
+SIG_LED_BIN=${SIG_LED_BIN:-robopi-sig-key}
+
+usage() {
+  cat <<'EOF'
+Usage: robopi-addon-hwtest COMMAND
+
+Commands:
+  status              Check package, commands and GPIO devices
+  ws2812-demo         Run the WS2812 demonstration
+  ws2812-red          Set all WS2812 pixels to dim red
+  ws2812-green        Set all WS2812 pixels to dim green
+  ws2812-blue         Set all WS2812 pixels to dim blue
+  ws2812-off          Turn all WS2812 pixels off
+  sig-led-latch       Rising edge on SIG latches the LED on
+  sig-led-1000        Rising edge turns the LED on for 1000 ms
+EOF
+}
+
+require_root() {
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "This hardware test must run as root." >&2
+    exit 1
+  fi
+}
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Required command is not installed: $1" >&2
+    echo "Install the roboparty-ws2812 package first." >&2
+    exit 2
+  fi
+}
+
+show_status() {
+  echo "========== RoboPi Addon Status =========="
+  echo
+  if ! dpkg-query -W -f='Package: ${Package}\nVersion: ${Version}\nStatus: ${Status}\n' roboparty-ws2812 2>/dev/null; then
+    echo "Package: roboparty-ws2812 (not installed)"
+  fi
+  echo
+  for cmd in "$WS2812_BIN" "$SIG_LED_BIN"; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+      echo "$cmd: $(command -v "$cmd")"
+    else
+      echo "$cmd: NOT FOUND"
+    fi
+  done
+  echo
+  for chip in /dev/gpiochip0 /dev/gpiochip1; do
+    [ -e "$chip" ] && echo "$chip: present" || echo "$chip: missing"
+  done
+  [ -e /dev/roboparty-ws2812 ] && \
+    echo "/dev/roboparty-ws2812: present" || \
+    echo "/dev/roboparty-ws2812: missing"
+}
+
+require_root
+
+case "${1:-}" in
+  status) show_status ;;
+  ws2812-demo) require_command "$WS2812_BIN"; exec "$WS2812_BIN" demo ;;
+  ws2812-red) require_command "$WS2812_BIN"; exec "$WS2812_BIN" solid 32 0 0 ;;
+  ws2812-green) require_command "$WS2812_BIN"; exec "$WS2812_BIN" solid 0 32 0 ;;
+  ws2812-blue) require_command "$WS2812_BIN"; exec "$WS2812_BIN" solid 0 0 32 ;;
+  ws2812-off) require_command "$WS2812_BIN"; exec "$WS2812_BIN" off ;;
+  sig-led-latch) require_command "$SIG_LED_BIN"; exec "$SIG_LED_BIN" ;;
+  sig-led-1000) require_command "$SIG_LED_BIN"; exec "$SIG_LED_BIN" --led-on-ms 1000 ;;
+  -h|--help|help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac
