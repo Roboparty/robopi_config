@@ -41,6 +41,15 @@ A system configuration tool for RoboParty boards, forked from [raspi-config](htt
 - Serial port list & loopback test
 - RS485 send/receive test with GPIO direction control
 - GPIO pin state viewer
+- RoboPi Addon test menu for WS2812 effects and SIG rising-edge/LED checks
+
+The addon entries require `roboparty-ws2812` and `robopi-sig-key` from
+`robopi_addon`. Open **Hardware Test -> RoboPi Addon**, then select a WS2812
+color/demo or a SIG/LED mode. Animated and edge-monitor tests show progress in
+the terminal and can be stopped with **Ctrl+C**.
+
+> Electrical safety: GPIO1_D5 is not 5 V tolerant. The SIG input must be
+> converted to the board's GPIO voltage before it reaches the RK3588S pin.
 
 ### Localisation
 - Locale (language & regional format)

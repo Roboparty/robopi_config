@@ -4798,7 +4798,7 @@ format_stty() {
 do_hwtest_menu() {
   while true; do
     FUN=$(whiptail --title "RoboParty Hardware Test" --menu "Select test item:" \
-      20 70 9 --cancel-button Back --ok-button Select \
+      20 74 10 --cancel-button Back --ok-button Select \
       "1"  "WiFi    - Real-time ping test (1s interval)" \
       "2"  "Ethernet - Real-time ping test (1s interval)" \
       "3"  "USB 2.0  - Check USB 2.0 ports (480Mbps)" \
@@ -4808,6 +4808,7 @@ do_hwtest_menu() {
       "7"  "Serial   - Serial/UART port list" \
       "8"  "RS485    - RS485 port test" \
       "9"  "GPIO     - GPIO/IO pin state" \
+      "10" "RoboPi Addon - WS2812, SIG and LED tests" \
       3>&1 1>&2 2>&3)
     RET=$?
     [ $RET -ne 0 ] && return 0
@@ -4821,8 +4822,74 @@ do_hwtest_menu() {
       7) do_test_serial ;;
       8) do_test_rs485 ;;
       9) do_test_gpio ;;
+      10) do_test_robopi_addon ;;
       *) whiptail --msgbox "Unknown option: $FUN" 10 40 ;;
     esac
+  done
+}
+
+do_test_robopi_addon() {
+  local tester="/usr/lib/robopi-config/robopi-addon-hwtest"
+
+  if [ ! -f "$tester" ]; then
+    whiptail --msgbox "RoboPi Addon test helper is missing:\n$tester\n\nInstall or update robopi-config first." 12 70
+    return
+  fi
+
+  while true; do
+    local action
+    action=$(whiptail --title "RoboPi Addon Hardware Test" \
+      --menu "Select an addon test:" 20 72 10 \
+      --cancel-button Back --ok-button Run \
+      "1" "Status       - Package, device and GPIO check" \
+      "2" "WS2812 Demo - Run the complete LED-strip demo" \
+      "3" "WS2812 Red  - Dim red solid color" \
+      "4" "WS2812 Green- Dim green solid color" \
+      "5" "WS2812 Blue - Dim blue solid color" \
+      "6" "WS2812 Off  - Turn the LED strip off" \
+      "7" "SIG/LED     - Rising edge latches LED on" \
+      "8" "SIG/LED 1s  - Rising edge lights LED for 1 second" \
+      3>&1 1>&2 2>&3)
+    [ $? -ne 0 ] && return
+
+    local command=""
+    case "$action" in
+      1) command="status" ;;
+      2) command="ws2812-demo" ;;
+      3) command="ws2812-red" ;;
+      4) command="ws2812-green" ;;
+      5) command="ws2812-blue" ;;
+      6) command="ws2812-off" ;;
+      7) command="sig-led-latch" ;;
+      8) command="sig-led-1000" ;;
+    esac
+
+    if [ "$action" = "7" ] || [ "$action" = "8" ]; then
+      whiptail --yesno "Electrical safety check:\n\nSIG must be within the GPIO1_D5 IO voltage range. Never connect a 5 V SIG directly to RK3588.\n\nContinue with the SIG rising-edge test?" 14 70 || continue
+    fi
+
+    clear
+    echo "========== RoboPi Addon Hardware Test =========="
+    echo
+    echo "Running: $command"
+    case "$command" in
+      ws2812-demo)
+        echo "The LED demo takes about 8 seconds and turns the strip off when complete."
+        ;;
+      sig-led-*)
+        echo "Waiting for SIG rising edges. Press Ctrl+C to stop the test."
+        ;;
+      *)
+        echo "Please observe the connected hardware."
+        ;;
+    esac
+    echo
+    bash "$tester" "$command"
+    local rc=$?
+    echo
+    echo "Test exit code: $rc"
+    read -r -n1 -p "Press any key to return to the addon test menu..."
+    echo
   done
 }
 
