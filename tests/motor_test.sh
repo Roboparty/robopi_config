@@ -1,0 +1,796 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (c) 2026 YutongChenVictor
+# LRO 电机 CAN/CANFD 综合测试工具 (TUI)
+# 修复: MIT帧位域、零点参数、带载测试ID匹配、发送频率
+
+
+# ================= 基础配置 =================
+SKIP_INIT=false
+INTERFACES=("can3")
+BITRATE=1000000
+DBITRATE=5000000
+SAMPLEPOINT=0.800
+SJW=4
+DSAMPLEPOINT=0.750
+DSJW=2
+
+# 电机ID列表 (支持任意编号, 你的电机是4、5)
+MOTOR_IDS=(4 5)
+NUM_MOTORS=${#MOTOR_IDS[@]}
+
+# MIT 控制帧参数 (一拖多模式使用)
+CANID=00008080
+SEND_COUNT=10000
+MIT_HZ=500
+# 零点: 位置中间值0x8000, 速度/扭矩中间值0x800
+MOTOR_ZERO_DATA="0080008008000000"
+
+ENABLE_RESCUE=false
+PARSE_ERROR=1
+RESCUE_LOG="can_rescue_mit.log"
+ERROR_LOG="/tmp/lro_error_$$.log"
+RAW_LOG="/tmp/lro_raw_$$.log"
+
+# 错误码映射 (data[0] & 0x1F)
+declare -A LRO_ERR_MAP=(
+    [01]="电机过热"   [02]="过流保护"   [03]="欠压保护"
+    [04]="编码器错误" [06]="刹车过压"   [07]="DRV驱动错误"
+)
+declare -A LRO_ERR_LAST LRO_ERR_LAST_TS
+
+# 固件版本查询码
+QUERY_VER_CMD="1E"
+
+# 带载测试默认参数 (更保守, 首次运行安全)
+LRO_LOAD_DURATION=10
+LRO_LOAD_POS_A="7000"   # 位置A, 略低于中点
+LRO_LOAD_POS_B="9000"   # 位置B, 略高于中点
+LRO_LOAD_KP="020"       # KP=32/4095 ≈ 3.9
+LRO_LOAD_KD="010"       # KD=16/511 ≈ 1.6
+LRO_LOAD_HZ=200         # 发送频率, 降低到bash可稳定范围
+
+# ================= UI 常量 =================
+readonly COL_RST=$'\e[0m'
+readonly COL_BOLD=$'\e[1m'
+readonly COL_DIM=$'\e[2m'
+readonly COL_RED=$'\e[31m'
+readonly COL_GRN=$'\e[32m'
+readonly COL_YEL=$'\e[33m'
+readonly COL_BLU=$'\e[34m'
+readonly COL_MAG=$'\e[35m'
+readonly COL_CYN=$'\e[36m'
+readonly COL_WHT=$'\e[37m'
+readonly COL_BRED=$'\e[1;31m'
+readonly COL_BGRN=$'\e[1;32m'
+readonly COL_BYEL=$'\e[1;33m'
+readonly COL_BCYN=$'\e[1;36m'
+readonly COL_BG_BLU=$'\e[44;1;37m'
+COLS=$(tput cols 2>/dev/null || echo 80)
+
+# ================= UI 辅助函数 =================
+center_text() {
+    local text="$1" attr="$2"
+    local tw=${COLS:-80} len=${#text} pad=$((tw - len))
+    [[ $pad -le 0 ]] && pad=2
+    local lp=$((pad / 2)) rp=$((pad - lp))
+    printf "${attr}%${lp}s%s%${rp}s${COL_RST}\n" "" "$text" ""
+}
+
+draw_header() {
+    local tw=${COLS:-80}
+    local title=" LRO 电机 CAN/CANFD 综合测试工具 "
+    local sub="接口: ${INTERFACES[*]} | 电机数: ${NUM_MOTORS} | $(date '+%Y-%m-%d %H:%M:%S')"
+    local line; line=$(printf '%*s' "$tw" '' | tr ' ' '═')
+    echo -e "${COL_BCYN}╔${line}╗${COL_RST}"
+    center_text "$title" "${COL_BG_BLU}"
+    local line2; line2=$(printf '%*s' "$tw" '' | tr ' ' '─')
+    echo -e "${COL_BCYN}╟${line2}╢${COL_RST}"
+    center_text "$sub" "${COL_DIM}"
+    echo -e "${COL_BCYN}╚${line}╝${COL_RST}"
+}
+
+draw_table_header() {
+    printf "${COL_DIM}  %-6s %-14s %-10s %-8s %-8s %-8s %-8s${COL_RST}\n" \
+        "$1" "状态" "TEC/REC" "RX/s" "TX/s" "BusErr" "ArbLst"
+    printf "  %s\n" "$(printf '%.0s─' {1..70})"
+}
+
+draw_table_row() {
+    local iface="$1" st="$2" tr="$3" rx="$4" tx="$5" be="$6" al="$7"
+    local c="${COL_GRN}"
+    [[ "$st" != "ERROR-ACTIVE" && -n "$st" ]] && c="${COL_YEL}"
+    [[ "$st" == "BUS-OFF" ]] && c="${COL_BRED}"
+    printf "  ${COL_CYN}%-6s${COL_RST} ${c}%-14s${COL_RST} %-10s %-8s %-8s %-8s %-8s\n" \
+        "$iface" "${st:--}" "$tr" "$rx" "$tx" "$be" "$al"
+}
+
+show_msg() { echo -e "\n  ${COL_GRN}▶ $1${COL_RST}"; }
+show_warn() { echo -e "\n  ${COL_YEL}⚠ $1${COL_RST}"; }
+show_err() { echo -e "\n  ${COL_BRED}✗ $1${COL_RST}"; }
+
+# ================= CAN 接口初始化 =================
+init_can_interfaces() {
+    if [[ "$SKIP_INIT" = false ]]; then
+        show_msg "配置 CAN 接口 (restart-ms + txqueuelen)..."
+        for IF in "${INTERFACES[@]}"; do
+            ip link set "$IF" down 2>/dev/null
+            if ip link set "$IF" type can bitrate $BITRATE sample-point $SAMPLEPOINT sjw $SJW \
+                    dbitrate $DBITRATE dsample-point $DSAMPLEPOINT dsjw $DSJW fd on restart-ms 100 2>/dev/null; then
+                ip link set "$IF" mtu 72
+                ip link set "$IF" txqueuelen 10000
+            fi
+            ip link set "$IF" up 2>/dev/null
+            echo -e "    ${COL_CYN}[$IF]${COL_RST} ${BITRATE}/$DBITRATE ds${DSAMPLEPOINT} restart-ms=100 qlen=10000"
+        done
+        echo ""
+    fi
+}
+
+# ================= 电机使能 & 标零 =================
+enable_and_zero_motors() {
+    local CMD_ENABLE="06" CMD_ZERO="03"
+    echo -e "${COL_BCYN}▶ 逐接口 逐电机: 使能 → 标零 → 再使能${COL_RST}"
+    for IF in "${INTERFACES[@]}"; do
+        for m in "${MOTOR_IDS[@]}"; do
+            MID=$(printf '%04X' $m)
+            printf "    ${COL_CYN}[%s]${COL_RST} Motor %d: 使能.." "$IF" "$m"
+            cansend "$IF" "7FF#${MID}00${CMD_ENABLE}"; sleep 0.3
+            printf "标零.."
+            cansend "$IF" "7FF#${MID}00${CMD_ZERO}"; sleep 0.2
+            printf "再使能.."
+            cansend "$IF" "7FF#${MID}00${CMD_ENABLE}"; sleep 0.3
+            echo -e "${COL_GRN}完成${COL_RST}"
+        done
+    done
+    echo ""
+}
+
+# ================= 帧构建 (已修正位域与零点) =================
+# 构建单电机 MIT 8字节帧: mode(3) | KP(12) | KD(9) | pos(16) | vel(12) | tor(12)
+# 对齐协议: 高位在前, 64bit 大端
+build_mit_frame() {
+    local mode=$(( ${1:-0} & 0x07 ))      # 3bit
+    local kp=$(( ${2:-0} & 0xFFF ))       # 12bit
+    local kd=$(( ${3:-0} & 0x1FF ))       # 9bit
+    local pos=$(( ${4:-0x8000} & 0xFFFF )) # 16bit
+    local vel=$(( ${5:-0x800} & 0xFFF ))  # 12bit
+    local tor=$(( ${6:-0x800} & 0xFFF ))  # 12bit
+
+    # 按位域拼接 64bit 整数
+    local frame64=$(( 
+        (mode << 61) | 
+        (kp << 49) | 
+        (kd << 40) | 
+        (pos << 24) | 
+        (vel << 12) | 
+        tor 
+    ))
+
+    # 转为16位十六进制大写 (8字节大端)
+    printf '%016X' "$frame64"
+}
+
+# 构建一拖多帧 (多个电机拼接)
+build_multi_mit_frame() {
+    local frame=""
+    for ((i=0; i<NUM_MOTORS; i++)); do
+        frame+="$MOTOR_ZERO_DATA"
+    done
+    # 补齐到8个电机位置 (64字节)
+    local remaining=$((8 - NUM_MOTORS))
+    for ((i=0; i<remaining; i++)); do
+        frame+="0000000000000000"
+    done
+    echo "$frame"
+}
+
+# ================= 错误监控 (后台 candump) =================
+start_error_monitor() {
+    local ifs; ifs=$(IFS=,; echo "${INTERFACES[*]}")
+    > "$RAW_LOG"
+    stdbuf -oL candump -L "$ifs" 2>/dev/null \
+        | stdbuf -oL grep -E '^\([0-9.]+\)\s+can[0-9]+\s+[0-9A-Fa-f]+#' \
+        | while read -r line; do
+            local ts iface midhex data
+            ts=$(echo "$line" | awk '{print $1}' | tr -d '()')
+            iface=$(echo "$line" | awk '{print $2}')
+            midhex=$(echo "$line" | awk '{print $3}' | cut -d'#' -f1)
+            data=$(echo "$line" | awk '{print $3}' | cut -d'#' -f2)
+            echo "$line" >> "$RAW_LOG"
+            local err_byte=$((16#${data:0:2}))
+            local err_code=$(( err_byte & 0x1F ))
+            if [[ $err_code -ne 0 ]]; then
+                local mid=$((16#$midhex))
+                local err_hex=$(printf '%02X' $err_code)
+                local err_name="${LRO_ERR_MAP[$err_hex]:-未知($err_hex)}"
+                echo "$ts|$iface|motor_$mid|$err_code|$err_name|$data"
+            fi
+        done >> "$ERROR_LOG" 2>/dev/null &
+    CANDUMP_PID=$!
+}
+
+stop_error_monitor() {
+    [[ -n "${CANDUMP_PID:-}" ]] && kill "$CANDUMP_PID" 2>/dev/null
+    rm -f "$ERROR_LOG" "$RAW_LOG"
+}
+
+parse_error_summary() {
+    LRO_ERR_LAST=()
+    LRO_ERR_LAST_TS=()
+    [[ ! -s "$ERROR_LOG" ]] && return
+    while IFS='|' read -r ts iface motor err_code err_name data; do
+        LRO_ERR_LAST["$iface:$motor"]="$err_name(0x$(printf '%02X' ${err_code:-0}))"
+        LRO_ERR_LAST_TS["$iface:$motor"]="$ts"
+    done < "$ERROR_LOG"
+}
+
+cleanup() {
+    echo -e "\n${COL_YEL}[!] 正在停止所有测试进程...${COL_RST}"
+    stop_error_monitor
+    kill $(jobs -p) 2>/dev/null
+    exit
+}
+trap cleanup INT TERM
+
+# ================= 固件版本查询 (已修复) =================
+query_fw_version() {
+    clear
+    draw_header
+    echo ""
+    echo -e "  ${COL_BCYN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COL_RST}"
+    echo -e "  ${COL_BCYN}  📋 固件版本查询 (协议查询码 30 = 0x1E)${COL_RST}"
+    echo -e "  ${COL_BCYN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COL_RST}"
+    echo ""
+
+    > "$RAW_LOG"
+
+    local total=$(( ${#INTERFACES[@]} * NUM_MOTORS ))
+    local idx=0
+    for IF in "${INTERFACES[@]}"; do
+        for m in "${MOTOR_IDS[@]}"; do
+            local mid_hex3=$(printf '%03x' $m)
+            ((idx++))
+            printf "  ${COL_DIM}[%d/%d] 发送 %-5s motor_%d 查询...${COL_RST}\r" "$idx" "$total" "$IF" "$m"
+            cansend "$IF" "${mid_hex3}#e0${QUERY_VER_CMD,,}" 2>/dev/null
+            sleep 0.08
+        done
+    done
+
+    echo -e "  ${COL_DIM}等待电机响应 (1.5s)...${COL_RST}"
+    sleep 1.5
+
+    declare -A VER_RESULT
+    for IF in "${INTERFACES[@]}"; do
+        for m in "${MOTOR_IDS[@]}"; do
+            local mid_low; mid_low=$(printf '%03x' $m)
+            local match
+            match=$(awk -v iface="$IF" -v mid="${mid_low}#" '
+                $2 == iface && index($3, mid) == 1 {
+                    data = $3
+                    sub(/^[^#]*#/, "", data)
+                    gsub(/ /, "", data)
+                    data = tolower(data)
+                    if (substr(data, 1, 2) != "e0") {
+                        print $3
+                        exit
+                    }
+                }
+            ' "$RAW_LOG" 2>/dev/null)
+
+            if [[ -n "$match" ]]; then
+                local resp_data="${match#*#}"
+                resp_data="${resp_data,,}"
+                resp_data="${resp_data// /}"
+
+                local b0=$((16#${resp_data:0:2}))
+                local resp_type=$(( (b0 >> 5) & 0x07 ))
+                local resp_query="${resp_data:2:2}"
+                local ver_payload="${resp_data:4}"
+
+                if [[ "$resp_type" -eq 5 && "${resp_query,,}" == "1e" && ${#ver_payload} -ge 12 ]]; then
+                    local sw0=$(( 16#${ver_payload:0:2} ))
+                    local sw1=$(( 16#${ver_payload:2:2} ))
+                    local sw2=$(( 16#${ver_payload:4:2} ))
+                    local hw0=$(( 16#${ver_payload:6:2} ))
+                    local hw1=$(( 16#${ver_payload:8:2} ))
+                    local hw2=$(( 16#${ver_payload:10:2} ))
+                    local sw_str="${sw0}.${sw1}.${sw2}"
+                    local hw_str="${hw0}.${hw1}.${hw2}"
+                    local proto_str="-"
+                    if [[ ${#ver_payload} -ge 20 ]]; then
+                        local pv0=$(( 16#${ver_payload:12:2} ))
+                        local pv1=$(( 16#${ver_payload:14:2} ))
+                        local pv2=$(( 16#${ver_payload:16:2} ))
+                        local pv3=$(( 16#${ver_payload:18:2} ))
+                        proto_str="${pv0}.${pv1}.${pv2}.${pv3}"
+                    fi
+                    VER_RESULT["${IF}_${m}"]="${sw_str}|${hw_str}|${proto_str}"
+                else
+                    VER_RESULT["${IF}_${m}"]="格式异常(type=${resp_type},q=${resp_query})|-|-"
+                fi
+            else
+                VER_RESULT["${IF}_${m}"]="无响应|-|-"
+            fi
+        done
+    done
+
+    if [[ -s "$RAW_LOG" ]]; then
+        local frame_cnt; frame_cnt=$(wc -l < "$RAW_LOG")
+        echo -e "  ${COL_DIM}捕获到 ${frame_cnt} 帧总线数据:${COL_RST}"
+        head -5 "$RAW_LOG" | while read -r fline; do
+            echo -e "    ${COL_DIM}${fline}${COL_RST}"
+        done
+        [[ $frame_cnt -gt 5 ]] && echo -e "    ${COL_DIM}... (共 $frame_cnt 帧)${COL_RST}"
+    else
+        echo -e "  ${COL_YEL}⚠ 未捕获到任何总线数据${COL_RST}"
+    fi
+    echo ""
+
+    echo -e "  ${COL_DIM}┌──────────┬────────────┬──────────┬──────────┬──────────────┐${COL_RST}"
+    echo -e "  ${COL_DIM}│${COL_RST} ${COL_BOLD}接口${COL_RST}     ${COL_DIM}│${COL_RST} ${COL_BOLD}电机${COL_RST}       ${COL_DIM}│${COL_RST} ${COL_BOLD}软件版本${COL_RST} ${COL_DIM}│${COL_RST} ${COL_BOLD}硬件版本${COL_RST} ${COL_DIM}│${COL_RST} ${COL_BOLD}协议版本${COL_RST}     ${COL_DIM}│${COL_RST}"
+    echo -e "  ${COL_DIM}├──────────┼────────────┼──────────┼──────────┼──────────────┤${COL_RST}"
+
+    for IF in "${INTERFACES[@]}"; do
+        for m in "${MOTOR_IDS[@]}"; do
+            local key="${IF}_${m}"
+            local raw="${VER_RESULT[$key]:-无响应|-|-}"
+            local sw hw proto
+            IFS='|' read -r sw hw proto <<< "$raw"
+            sw="${sw:-无响应}"; hw="${hw:-无响应}"; proto="${proto:-无响应}"
+            local sw_c="${COL_BRED}" hw_c="${COL_BRED}" proto_c="${COL_DIM}"
+            [[ "$sw" != "无响应" && "$sw" != "格式异常"* ]] && sw_c="${COL_BGRN}"
+            [[ "$hw" != "无响应" && "$hw" != "格式异常"* && "$hw" != "-" ]] && hw_c="${COL_BGRN}"
+            [[ "$proto" != "-" && "$proto" != "无响应" ]] && proto_c="${COL_BGRN}"
+            printf "  ${COL_DIM}│${COL_RST} ${COL_CYN}%-8s${COL_RST} ${COL_DIM}│${COL_RST} Motor %-5d ${COL_DIM}│${COL_RST} ${sw_c}%-8s${COL_RST} ${COL_DIM}│${COL_RST} ${hw_c}%-8s${COL_RST} ${COL_DIM}│${COL_RST} ${proto_c}%-12s${COL_RST} ${COL_DIM}│${COL_RST}\n" \
+                "$IF" "$m" "$sw" "$hw" "$proto"
+        done
+    done
+    echo -e "  ${COL_DIM}└──────────┴────────────┴──────────┴──────────┴──────────────┘${COL_RST}"
+    echo ""
+    echo -e "  ${COL_DIM}按任意键返回主菜单...${COL_RST}"
+    read -rs -n 1
+}
+
+# ================= 带载测试 (已完全修复) =================
+run_load_test() {
+    local duration="$LRO_LOAD_DURATION"
+    local pos_a="$LRO_LOAD_POS_A" pos_b="$LRO_LOAD_POS_B"
+    local kp="$LRO_LOAD_KP" kd="$LRO_LOAD_KD"
+    local hz="$LRO_LOAD_HZ"
+    local interval_us=$((1000000 / hz))
+
+    local START_TIME END_TIME TOTAL_OK=0 TOTAL_FAIL=0
+    local key=""
+    local testing=false
+    declare -A last_rx_load last_tx_load
+
+    while true; do
+        clear
+        draw_header
+        echo ""
+
+        echo -e "  ${COL_BCYN}━━━ 带载测试参数 (一拖一模式) ━━━${COL_RST}"
+        echo -e "  ${COL_CYN}[D]${COL_RST} 持续时间:  ${COL_BOLD}${duration}${COL_RST} s"
+        echo -e "  ${COL_CYN}[A]${COL_RST} 位置 A:    ${COL_BOLD}0x${pos_a}${COL_RST}"
+        echo -e "  ${COL_CYN}[B]${COL_RST} 位置 B:    ${COL_BOLD}0x${pos_b}${COL_RST}"
+        echo -e "  ${COL_CYN}[K]${COL_RST} 刚度 KP:   ${COL_BOLD}0x${kp}${COL_RST}"
+        echo -e "  ${COL_CYN}[C]${COL_RST} 阻尼 KD:   ${COL_BOLD}0x${kd}${COL_RST}"
+        echo -e "  ${COL_CYN}[F]${COL_RST} 发送频率:  ${COL_BOLD}${hz} Hz${COL_RST}"
+        echo -e "  ${COL_DIM}  说明: 位置0x8000为中点, 范围0~65535对应-12.5~12.5rad${COL_RST}"
+        echo ""
+
+        if [[ "$testing" == true ]]; then
+            local NOW; NOW=$(date +%s)
+            local ELAPSED=$(( NOW - START_TIME ))
+            local REMAIN=$(( duration - ELAPSED ))
+            [[ $REMAIN -lt 0 ]] && REMAIN=0
+            local progress=0
+            [[ $duration -gt 0 ]] && progress=$(( ELAPSED * 30 / duration ))
+            [[ $progress -gt 30 ]] && progress=30
+            local bar; bar=$(printf '%*s' "$progress" '' | tr ' ' '█')
+            local empty; empty=$(printf '%*s' "$((30 - progress))" '' | tr ' ' '░')
+
+            echo -e "  ${COL_BYEL}━━━ 测试进行中 ━━━${COL_RST}"
+            echo -e "  进度: ${COL_BYEL}${bar}${COL_DIM}${empty}${COL_RST}  ${ELAPSED}s / ${duration}s  (剩余 ${REMAIN}s)"
+            echo -e "  已发送: ${COL_BOLD}$(( TOTAL_OK + TOTAL_FAIL ))${COL_RST} 帧  (成功: ${COL_GRN}${TOTAL_OK}${COL_RST}  失败: ${COL_BRED}${TOTAL_FAIL}${COL_RST})"
+            echo ""
+
+            draw_table_header "接口"
+            for IF in "${INTERFACES[@]}"; do
+                local ip_info; ip_info=$(ip -d -s link show "$IF" 2>/dev/null)
+                local st; st=$(echo "$ip_info" | grep -oE "ERROR-(ACTIVE|WARNING|PASSIVE)|BUS-OFF|STOPPED" | head -1)
+                local tec_rec; tec_rec=$(echo "$ip_info" | grep -A1 "bus-errors" | tail -n1 | awk '{print $1"/"$2}')
+                local be; be=$(echo "$ip_info" | grep -oP "bus-errors \K[0-9]+" || echo 0)
+                local al; al=$(echo "$ip_info" | grep -oP "arbitration-lost \K[0-9]+" || echo 0)
+                local cur_rx; cur_rx=$(cat /sys/class/net/$IF/statistics/rx_packets 2>/dev/null || echo 0)
+                local cur_tx; cur_tx=$(cat /sys/class/net/$IF/statistics/tx_packets 2>/dev/null || echo 0)
+                local rx_r=$(( cur_rx - ${last_rx_load[$IF]:-$cur_rx} ))
+                local tx_r=$(( cur_tx - ${last_tx_load[$IF]:-$cur_tx} ))
+                last_rx_load[$IF]=$cur_rx
+                last_tx_load[$IF]=$cur_tx
+                draw_table_row "$IF" "$st" "$tec_rec" "$rx_r" "$tx_r" "$be" "$al"
+            done
+            echo ""
+
+            parse_error_summary
+            local err_cnt=0
+            echo -e "  ${COL_BOLD}电机错误反馈:${COL_RST}"
+            for IF in "${INTERFACES[@]}"; do
+                for m in "${MOTOR_IDS[@]}"; do
+                    local k="$IF:motor_$m"
+                    if [[ -n "${LRO_ERR_LAST[$k]:-}" ]]; then
+                        echo -e "    ${COL_BRED}✗ [$IF motor_$m] ${LRO_ERR_LAST[$k]}${COL_RST}"
+                        ((err_cnt++))
+                    fi
+                done
+            done
+            [[ $err_cnt -eq 0 ]] && echo -e "    ${COL_BGRN}✓ 全部正常 (无错误上报)${COL_RST}"
+            echo ""
+
+            # 逐电机发送控制帧 (一拖一模式, 每个电机独立ID)
+            for IF in "${INTERFACES[@]}"; do
+                local st; st=$(ip -d -s link show "$IF" | grep -oE "ERROR-(ACTIVE|WARNING|PASSIVE)|BUS-OFF|STOPPED" | head -1)
+                if [[ "$st" == "BUS-OFF" || "$st" == "STOPPED" ]] && [[ "$ENABLE_RESCUE" == true ]]; then
+                    ip link set "$IF" type can restart 2>/dev/null
+                fi
+
+                # 交替选择位置A/B
+                local fdata
+                if (( (TOTAL_OK + TOTAL_FAIL) % 2 == 0 )); then
+                    fdata=$(build_mit_frame 0 $((16#$kp)) $((16#$kd)) $((16#$pos_a)) 0x800 0x800)
+                else
+                    fdata=$(build_mit_frame 0 $((16#$kp)) $((16#$kd)) $((16#$pos_b)) 0x800 0x800)
+                fi
+
+                # 给每个电机都发一帧
+                for m in "${MOTOR_IDS[@]}"; do
+                    local mid_hex=$(printf '%03x' $m)
+                    if cansend "$IF" "${mid_hex}#${fdata}" 2>/dev/null; then
+                        ((TOTAL_OK++))
+                    else
+                        ((TOTAL_FAIL++))
+                    fi
+                done
+
+                # 帧间隔延时
+                usleep "$interval_us" 2>/dev/null || sleep 0.005
+            done
+
+            # 检查是否结束
+            if (( ELAPSED >= duration )); then
+                testing=false
+                END_TIME=$(date +%s)
+                TOTAL=$(( TOTAL_OK + TOTAL_FAIL ))
+                local elapsed_ms=$(( (END_TIME - START_TIME) * 1000 ))
+                local fps=0
+                [[ $elapsed_ms -gt 0 ]] && fps=$(( TOTAL * 1000 / elapsed_ms ))
+
+                echo -e "  ${COL_BYEL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COL_RST}"
+                echo -e "  ${COL_BGRN}✓ 带载测试完成!${COL_RST}"
+                echo -e "  总帧数:   $TOTAL"
+                echo -e "  成功:     ${COL_GRN}$TOTAL_OK${COL_RST}  失败: ${COL_BRED}$TOTAL_FAIL${COL_RST}"
+                echo -e "  实际速率: ${fps} 帧/s  (目标: ${hz} Hz)"
+                echo -e "  用时:     $(( elapsed_ms / 1000 )) s"
+
+                parse_error_summary
+                local sum_err=0
+                for IF in "${INTERFACES[@]}"; do
+                    for m in "${MOTOR_IDS[@]}"; do
+                        [[ -n "${LRO_ERR_LAST[$IF:motor_$m]:-}" ]] && ((sum_err++))
+                    done
+                done
+                if [[ $sum_err -eq 0 ]]; then
+                    echo -e "  错误:     ${COL_BGRN}全部正常${COL_RST}"
+                else
+                    echo -e "  错误电机: ${COL_BRED}${sum_err} 个${COL_RST}"
+                fi
+                echo -e "  ${COL_BYEL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COL_RST}"
+                echo ""
+                echo -e "  ${COL_DIM}按任意键返回...${COL_RST}"
+                read -rs -n 1
+            fi
+
+        else
+            echo -e "  ${COL_BCYN}━━━ 操作 ━━━${COL_RST}"
+            echo -e "    ${COL_GRN}${COL_BOLD}[SPACE]${COL_RST} 开始带载测试"
+            echo -e "    ${COL_DIM}调整参数请按 D/A/B/K/C/F 键${COL_RST}"
+            echo -e "    ${COL_RED}⚠ 首次运行请保持小幅度、低刚度${COL_RST}"
+            echo ""
+
+            draw_table_header "接口"
+            for IF in "${INTERFACES[@]}"; do
+                local ip_info; ip_info=$(ip -d -s link show "$IF" 2>/dev/null)
+                local st; st=$(echo "$ip_info" | grep -oE "ERROR-(ACTIVE|WARNING|PASSIVE)|BUS-OFF|STOPPED" | head -1)
+                local tec_rec; tec_rec=$(echo "$ip_info" | grep -A1 "bus-errors" | tail -n1 | awk '{print $1"/"$2}')
+                local be; be=$(echo "$ip_info" | grep -oP "bus-errors \K[0-9]+" || echo 0)
+                local al; al=$(echo "$ip_info" | grep -oP "arbitration-lost \K[0-9]+" || echo 0)
+                draw_table_row "$IF" "$st" "$tec_rec" "-" "-" "$be" "$al"
+            done
+            echo ""
+        fi
+
+        read -rs -t 0.05 -N 1 key
+        case "$key" in
+            ' ')
+                if [[ "$testing" == false ]]; then
+                    testing=true
+                    TOTAL_OK=0; TOTAL_FAIL=0
+                    last_rx_load=()
+                    last_tx_load=()
+                    START_TIME=$(date +%s)
+                fi
+                ;;
+            d|D) (( duration += 5 ))  ;;
+            a|A) pos_a=$(printf '%04X' $(( (0x$pos_a + 0x200) & 0xFFFF )));;
+            b|B) pos_b=$(printf '%04X' $(( (0x$pos_b + 0x200) & 0xFFFF )));;
+            k|K) kp=$(printf '%03X' $(( (0x$kp + 0x10) & 0xFFF )));;
+            c|C) kd=$(printf '%03X' $(( (0x$kd + 0x08) & 0x1FF )));;
+            f|F) (( hz += 50 )) ;;
+            q|Q) return ;;
+        esac
+        LRO_LOAD_DURATION=$duration
+        LRO_LOAD_POS_A=$pos_a; LRO_LOAD_POS_B=$pos_b
+        LRO_LOAD_KP=$kp; LRO_LOAD_KD=$kd; LRO_LOAD_HZ=$hz
+    done
+}
+
+# ================= MIT 连发 (一拖多模式, 保留原功能) =================
+run_mit_flood() {
+    clear
+    draw_header
+    echo ""
+    echo -e "  ${COL_BCYN}━━━ MIT 连发测试 (一拖多模式) ━━━${COL_RST}"
+    echo -e "  CANID: ${COL_BOLD}0x${CANID}${COL_RST} | 帧数据: 64B CANFD | 连发: ${COL_BOLD}${SEND_COUNT}${COL_RST} 帧/接口"
+    echo -e "  频率:  ${COL_BOLD}${MIT_HZ} Hz${COL_RST} | 数据: MIT 零位 (中点)"
+    echo -e "  ${COL_DIM}  说明: 按NUM_MOTORS数量填充前N个电机位置${COL_RST}"
+    echo ""
+
+    FRAME_DATA=$(build_multi_mit_frame)
+    show_msg "开始连发 ${SEND_COUNT} 帧 MIT 零位指令..."
+
+    local START; START=$(date +%s%N)
+    local SUCCESS=0 FAIL=0
+
+    for IF in "${INTERFACES[@]}"; do
+        local IF_OK=0 IF_FAIL=0
+        local SLEEP_US=$(( 1000000 / MIT_HZ ))
+        for ((i=1; i<=SEND_COUNT; i++)); do
+            if cansend "$IF" "${CANID}##1${FRAME_DATA}" 2>/dev/null; then
+                ((IF_OK++))
+            else
+                ((IF_FAIL++))
+            fi
+            usleep "$SLEEP_US" 2>/dev/null || sleep 0.002
+        done
+        echo -e "  ${COL_CYN}[$IF]${COL_RST} 完成: ${COL_GRN}成功=$IF_OK${COL_RST}  ${COL_BRED}失败=$IF_FAIL${COL_RST}"
+        ((SUCCESS += IF_OK))
+        ((FAIL += IF_FAIL))
+    done
+
+    local END; END=$(date +%s%N)
+    local ELAPSED=$(( (END - START) / 1000000 ))
+    local TOTAL=$((SUCCESS + FAIL))
+
+    echo ""
+    echo -e "  ${COL_BCYN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COL_RST}"
+    echo -e "  ${COL_BGRN}✓ 连发完成!${COL_RST}"
+    echo -e "  总帧数:   $TOTAL"
+    echo -e "  成功:     ${COL_GRN}$SUCCESS${COL_RST}  失败: ${COL_BRED}$FAIL${COL_RST}"
+    if [[ $ELAPSED -gt 0 ]]; then
+        local rate; rate=$(echo "scale=1; $TOTAL * 1000 / $ELAPSED" | bc)
+        echo -e "  实际速率: ${rate} 帧/s"
+    fi
+    echo -e "  用时:     ${ELAPSED} ms"
+    echo -e "  日志:     $RESCUE_LOG"
+    echo -e "  ${COL_BCYN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COL_RST}"
+    echo ""
+    echo -e "  ${COL_DIM}按任意键返回主菜单...${COL_RST}"
+    read -rs -n 1
+}
+
+# ================= CAN 通信诊断 =================
+diag_can_comm() {
+    clear
+    draw_header
+    echo ""
+    echo -e "  ${COL_BCYN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COL_RST}"
+    echo -e "  ${COL_BCYN}  🔧 CAN 通信诊断${COL_RST}"
+    echo -e "  ${COL_BCYN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COL_RST}"
+    echo ""
+
+    for IF in "${INTERFACES[@]}"; do
+        echo -e "  ${COL_BOLD}=== 接口: $IF ===${COL_RST}"
+        stop_error_monitor
+
+        local rx_before; rx_before=$(cat /sys/class/net/$IF/statistics/rx_packets 2>/dev/null || echo 0)
+
+        local diag_log="/tmp/diag_can.log"
+        rm -f "$diag_log"
+        stdbuf -o0 candump -L "$IF" > "$diag_log" 2>/dev/null &
+        local cpid=$!
+        sleep 0.5
+
+        for m in "${MOTOR_IDS[@]}"; do
+            MID=$(printf '%04X' $m)
+            local mid_low; mid_low=$(printf '%03x' $m)
+            echo ""
+            echo -e "  ${COL_CYN}--- Motor $m (ID=0x$MID) ---${COL_RST}"
+
+            echo -n "  发送使能 7FF#${MID}0006 ... "
+            local send_out; send_out=$(cansend "$IF" "7FF#${MID}0006" 2>&1)
+            [[ $? -eq 0 ]] && echo -e "${COL_GRN}发送成功${COL_RST}" || echo -e "${COL_BRED}发送失败: $send_out${COL_RST}"
+            sleep 0.5
+
+            echo -n "  发送版本查询 ${mid_low}#e01E ... "
+            send_out=$(cansend "$IF" "${mid_low}#e01E" 2>&1)
+            [[ $? -eq 0 ]] && echo -e "${COL_GRN}发送成功${COL_RST}" || echo -e "${COL_BRED}发送失败: $send_out${COL_RST}"
+            sleep 0.5
+
+            local found_any=false
+            while IFS= read -r logline; do
+                [[ -z "$logline" ]] && continue
+                local frame; frame=$(echo "$logline" | awk '{print $3}')
+                local fid; fid=$(echo "$frame" | cut -d'#' -f1)
+                local fdata; fdata=$(echo "$frame" | cut -d'#' -f2)
+                fdata="${fdata// /}"
+                local fid_low="${fid,,}"
+                if [[ "$fid_low" == "$mid_low" ]]; then
+                    local b0_hex="${fdata:0:2}"
+                    local b0=$(( 16#$b0_hex ))
+                    local msg_type=$(( (b0 >> 5) & 0x07 ))
+                    [[ $msg_type -eq 7 ]] && continue
+                    found_any=true
+                    echo -e "    ${COL_GRN}◀ 响应: $fid#$fdata${COL_RST}"
+                    if [[ ${#fdata} -ge 2 ]]; then
+                        local err_info=$(( b0 & 0x1F ))
+                        local qcode="${fdata:2:2}"
+                        echo -e "      ${COL_DIM}报文类型=$msg_type 错误=$err_info byte1=0x${qcode:-??}${COL_RST}"
+                        if [[ "$msg_type" -eq 5 && "${qcode,,}" == "1e" && ${#fdata} -ge 16 ]]; then
+                            local vp="${fdata:4}"
+                            echo -e "      ${COL_BGRN}版本数据: ${vp}${COL_RST}"
+                            printf "      软件: %d.%d.%d\n" $((16#${vp:0:2})) $((16#${vp:2:2})) $((16#${vp:4:2}))
+                            printf "      硬件: %d.%d.%d\n" $((16#${vp:6:2})) $((16#${vp:8:2})) $((16#${vp:10:2}))
+                        fi
+                    fi
+                fi
+            done < "$diag_log"
+
+            [[ "$found_any" == false ]] && echo -e "    ${COL_BRED}✗ 无响应${COL_RST}"
+            > "$diag_log"
+        done
+
+        sleep 0.3
+        kill $cpid 2>/dev/null; wait $cpid 2>/dev/null
+
+        local rx_after; rx_after=$(cat /sys/class/net/$IF/statistics/rx_packets 2>/dev/null || echo 0)
+        local rx_delta=$((rx_after - rx_before))
+        echo ""
+        echo -e "  ${COL_DIM}接口 $IF: RX 增量 = $rx_delta 帧 (诊断期间)${COL_RST}"
+        echo -e "  ${COL_DIM}接口状态: $(ip -d -s link show $IF 2>/dev/null | grep -oE 'UP|DOWN|ERROR-ACTIVE|BUS-OFF' | head -1)${COL_RST}"
+        echo ""
+
+        if [[ $PARSE_ERROR -eq 1 ]]; then
+            > "$RAW_LOG"
+            start_error_monitor
+        fi
+    done
+
+    echo -e "  ${COL_DIM}按任意键返回...${COL_RST}"
+    read -rs -n 1
+}
+
+# ================= MIT 参数配置 =================
+config_mit_params() {
+    while true; do
+        clear
+        draw_header
+        echo ""
+        echo -e "  ${COL_BCYN}━━━ MIT 连发参数 ━━━${COL_RST}"
+        echo -e "    ${COL_CYN}[N]${COL_RST} 电机数量:    ${COL_BOLD}${NUM_MOTORS}${COL_RST}"
+        echo -e "    ${COL_CYN}[H]${COL_RST} MIT 发送频率: ${COL_BOLD}${MIT_HZ} Hz${COL_RST}"
+        echo -e "    ${COL_CYN}[C]${COL_RST} 连发次数:    ${COL_BOLD}${SEND_COUNT}${COL_RST}"
+        echo -e "    ${COL_CYN}[I]${COL_RST} CAN ID:      ${COL_BOLD}0x${CANID}${COL_RST}"
+        echo ""
+        echo -e "  ${COL_BCYN}━━━ 操作 ━━━${COL_RST}"
+        echo -e "    ${COL_GRN}[SPACE]${COL_RST} 开始 MIT 连发"
+        echo -e "    ${COL_CYN}[ESC]${COL_RST}   返回主菜单"
+        echo ""
+
+        read -rs -t 1 -N 1 key
+        case "$key" in
+            n|N) read -p "  电机数量 (1-8): " v; [[ "$v" =~ ^[1-8]$ ]] && NUM_MOTORS=$v ;;
+            h|H) read -p "  MIT 频率 (Hz): " v;  [[ "$v" =~ ^[0-9]+$ ]] && MIT_HZ=$v ;;
+            c|C) read -p "  连发次数: " v;        [[ "$v" =~ ^[0-9]+$ ]] && SEND_COUNT=$v ;;
+            i|I) read -p "  CAN ID (hex, 8位): " v; [[ "$v" =~ ^[0-9A-Fa-f]{8}$ ]] && CANID=$v ;;
+            ' ') run_mit_flood ;;
+            $'\e'|'') return ;;
+        esac
+    done
+}
+
+# ================= 主菜单 =================
+show_main_menu() {
+    echo -e "  ${COL_BCYN}━━━ 主菜单 ━━━${COL_RST}"
+    echo ""
+    echo -e "    ${COL_GRN}${COL_BOLD}[1]${COL_RST}  📋 查询固件版本"
+    echo -e "    ${COL_YEL}${COL_BOLD}[2]${COL_RST}  ⚡ 带载测试"
+    echo -e "    ${COL_MAG}${COL_BOLD}[3]${COL_RST}  📡 MIT 连续发送 (一拖多)"
+    echo -e "    ${COL_CYN}${COL_BOLD}[4]${COL_RST}  ⚙  MIT 参数配置"
+    echo -e "    ${COL_WHT}${COL_BOLD}[D]${COL_RST}  🔧 CAN 通信诊断"
+    echo -e "    ${COL_BRED}${COL_BOLD}[Q]${COL_RST}  🚪 退出"
+    echo ""
+
+    draw_table_header "接口"
+    for IF in "${INTERFACES[@]}"; do
+        local ip_info; ip_info=$(ip -d -s link show "$IF" 2>/dev/null)
+        local st; st=$(echo "$ip_info" | grep -oE "ERROR-(ACTIVE|WARNING|PASSIVE)|BUS-OFF|STOPPED" | head -1)
+        local tec_rec; tec_rec=$(echo "$ip_info" | grep -A1 "bus-errors" | tail -n1 | awk '{print $1"/"$2}')
+        local rx_p; rx_p=$(cat /sys/class/net/$IF/statistics/rx_packets 2>/dev/null || echo 0)
+        local tx_p; tx_p=$(cat /sys/class/net/$IF/statistics/tx_packets 2>/dev/null || echo 0)
+        local be; be=$(echo "$ip_info" | grep -oP "bus-errors \K[0-9]+" || echo 0)
+        local al; al=$(echo "$ip_info" | grep -oP "arbitration-lost \K[0-9]+" || echo 0)
+        draw_table_row "$IF" "$st" "$tec_rec" "$rx_p" "$tx_p" "$be" "$al"
+    done
+    echo ""
+
+    if [[ $PARSE_ERROR -eq 1 ]]; then
+        parse_error_summary
+        local err_cnt=0
+        echo -e "  ${COL_BOLD}电机错误反馈:${COL_RST}"
+        for IF in "${INTERFACES[@]}"; do
+            for m in "${MOTOR_IDS[@]}"; do
+                local k="$IF:motor_$m"
+                if [[ -n "${LRO_ERR_LAST[$k]:-}" ]]; then
+                    echo -e "    ${COL_BRED}✗ [$IF motor_$m] ${LRO_ERR_LAST[$k]}${COL_RST}"
+                    ((err_cnt++))
+                fi
+            done
+        done
+        [[ $err_cnt -eq 0 ]] && echo -e "    ${COL_BGRN}✓ 全部正常${COL_RST}"
+        echo ""
+    fi
+
+    printf "  ${COL_BOLD}选择操作:${COL_RST} "
+}
+
+# ================= 入口 =================
+main() {
+    if [[ "$EUID" -ne 0 ]]; then
+        show_err "请使用 sudo 运行此脚本"
+        exit 1
+    fi
+
+    init_can_interfaces
+    enable_and_zero_motors
+
+    echo "--- CAN MIT Log Start: $(date) ---" > "$RESCUE_LOG"
+    > "$ERROR_LOG"
+
+    if [[ $PARSE_ERROR -eq 1 ]]; then
+        start_error_monitor
+    fi
+
+    while true; do
+        clear
+        draw_header
+        echo ""
+        show_main_menu
+
+        read -rs -t 2 -N 1 key
+        case "$key" in
+            1) query_fw_version ;;
+            2) run_load_test ;;
+            3) run_mit_flood ;;
+            4) config_mit_params ;;
+            d|D) diag_can_comm ;;
+            q|Q)
+                echo ""
+                show_msg "退出。再见！"
+                exit 0
+                ;;
+        esac
+    done
+}
+
+main "$@"
