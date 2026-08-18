@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -u
+
+# Read-only LeadRobot CAN-FD communication test.
+# Only E0 00 (manufacturer query) is transmitted. No motion command is used.
+
+CAN_IFACE="${1:-can_top}"
+shift $(( $# > 0 ? 1 : 0 ))
+if [ "$#" -gt 0 ]; then
+  MOTOR_IDS=("$@")
+else
+  MOTOR_IDS=(1 2)
+fi
+QUERY_RETRIES="${QUERY_RETRIES:-3}"
+QUERY_INTERVAL="${QUERY_INTERVAL:-0.35}"
+CAPTURE_SECONDS="${CAPTURE_SECONDS:-10}"
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Run this test as root." >&2
+  exit 1
+fi
+
+for command_name in ip candump cansend timeout grep mktemp; do
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "Missing command: $command_name" >&2
+    exit 1
+  fi
+done
+
+if ! ip link show "$CAN_IFACE" >/dev/null 2>&1; then
+  echo "CAN interface not found: $CAN_IFACE" >&2
+  exit 1
+fi
+
+if ! ip -details link show "$CAN_IFACE" | grep -q '<FD>'; then
+  echo "$CAN_IFACE is not in normal CAN-FD mode." >&2
+  echo "Expected <FD>; internal loopback mode is not accepted." >&2
+  exit 1
+fi
+
+if (( ${#MOTOR_IDS[@]} < 1 || ${#MOTOR_IDS[@]} > 8 )); then
+  echo "Specify between 1 and 8 motor IDs." >&2
+  exit 1
+fi
+for motor_id in "${MOTOR_IDS[@]}"; do
+  [[ "$motor_id" =~ ^[0-9]+$ ]] || { echo "Motor IDs must be decimal integers." >&2; exit 1; }
+  (( motor_id >= 1 && motor_id <= 2047 )) || { echo "Motor IDs must be in the range 1..2047." >&2; exit 1; }
+done
+CAPTURE_FILE=$(mktemp /tmp/rp-head-comm-only.XXXXXX)
+CAPTURE_PID=""
+
+cleanup() {
+  if [ -n "$CAPTURE_PID" ]; then
+    kill "$CAPTURE_PID" >/dev/null 2>&1 || true
+    wait "$CAPTURE_PID" >/dev/null 2>&1 || true
+  fi
+  rm -f "$CAPTURE_FILE"
+}
+on_signal() {
+  trap - EXIT INT TERM
+  cleanup
+  exit 130
+}
+trap cleanup EXIT
+trap on_signal INT TERM
+
+echo "Read-only communication test"
+echo "  CAN:       $CAN_IFACE"
+echo "  Motor IDs: ${MOTOR_IDS[*]}"
+echo "  Command:   manufacturer query only (E0 00)"
+echo "  Motion:    no enable/position/speed/torque commands are sent"
+echo "  Retries:   $QUERY_RETRIES per motor"
+
+timeout "$CAPTURE_SECONDS" candump -e -x "$CAN_IFACE" >"$CAPTURE_FILE" &
+CAPTURE_PID=$!
+sleep 1
+
+for motor_id in "${MOTOR_IDS[@]}"; do
+  motor_hex=$(printf '%03X' "$motor_id")
+  attempt=1
+  while [ "$attempt" -le "$QUERY_RETRIES" ]; do
+    cansend "$CAN_IFACE" "${motor_hex}##1E000"
+    sleep "$QUERY_INTERVAL"
+    attempt=$((attempt + 1))
+  done
+  sleep 0.5
+done
+
+wait "$CAPTURE_PID" >/dev/null 2>&1 || true
+CAPTURE_PID=""
+
+echo
+echo "Captured frames:"
+cat "$CAPTURE_FILE"
+echo
+
+PASS=1
+for motor_id in "${MOTOR_IDS[@]}"; do
+  motor_hex=$(printf '%03X' "$motor_id")
+  if grep -Eiq "RX.*${motor_hex}.*\[03\].*A0[[:space:]]+00[[:space:]]+03" "$CAPTURE_FILE"; then
+    echo "ID $((16#$motor_hex)): PASS - real LeadRobot reply received"
+  else
+    echo "ID $((16#$motor_hex)): FAIL - no matching RX A0 00 03 reply" >&2
+    PASS=0
+  fi
+done
+
+echo
+ip -details -statistics link show "$CAN_IFACE"
+
+if [ "$PASS" -eq 1 ]; then
+  echo "HEAD_COMM_PASS: all configured motors replied; no motion command was sent"
+  exit 0
+fi
+
+echo "HEAD_COMM_FAIL: missing a real motor reply" >&2
+exit 1

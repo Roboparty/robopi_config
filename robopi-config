@@ -4825,6 +4825,8 @@ do_hwtest_menu() {
       "8"  "RS485    - RS485 port test" \
       "9"  "GPIO     - GPIO/IO pin state" \
       "10" "RoboPi Addon - WS2812, SIG and LED tests" \
+      "11" "Head Motor - Read-only CAN-FD communication test" \
+      "12" "Head Daisy-chain - ACTIVE motor test" \
       3>&1 1>&2 2>&3)
     RET=$?
     [ $RET -ne 0 ] && return 0
@@ -4839,6 +4841,8 @@ do_hwtest_menu() {
       8) do_test_rs485 ;;
       9) do_test_gpio ;;
       10) do_test_robopi_addon ;;
+      11) do_test_head ;;
+      12) do_test_head_series ;;
       *) whiptail --msgbox "Unknown option: $FUN" 10 40 ;;
     esac
   done
@@ -4907,6 +4911,81 @@ do_test_robopi_addon() {
     read -r -n1 -p "Press any key to return to the addon test menu..."
     echo
   done
+}
+
+do_test_head() {
+  local tester="/usr/lib/robopi-config/rp-head-comm-only-test"
+  [ -f "$tester" ] || tester="$(dirname "$0")/usr/lib/robopi-config/rp-head-comm-only-test"
+
+  if [ ! -f "$tester" ]; then
+    whiptail --msgbox "Head motor read-only test helper is missing:\n$tester\n\nInstall or update robopi-config first." 12 72
+    return
+  fi
+  local values can_iface motor_ids
+  local -a motor_id_array
+  values=$(whiptail --title "Head Motor Read-only Test" --inputbox \
+    "Enter: CAN-interface motor-ID-list\n\nIDs are separated by spaces. Example: can_top 1 2 3\nOnly manufacturer query E0 00 is sent." \
+    14 72 "can_top 1 2" 3>&1 1>&2 2>&3) || return
+  can_iface=$(echo "$values" | awk '{print $1}')
+  motor_ids=$(echo "$values" | cut -d' ' -f2-)
+  [ -n "$can_iface" ] && [ -n "$motor_ids" ] || {
+    whiptail --msgbox "A CAN interface and at least one motor ID are required." 9 64
+    return
+  }
+  ip link show "$can_iface" >/dev/null 2>&1 || {
+    whiptail --msgbox "CAN interface $can_iface was not found." 9 58
+    return
+  }
+  read -r -a motor_id_array <<< "$motor_ids"
+
+  clear
+  bash "$tester" "$can_iface" "${motor_id_array[@]}"
+  local rc=$?
+  echo
+  echo "Test exit code: $rc"
+  read -r -n1 -p "Press any key to return to the hardware-test menu..."
+  echo
+}
+
+do_test_head_series() {
+  local tester="/usr/lib/robopi-config/rp-head-series-test"
+  [ -f "$tester" ] || tester="$(dirname "$0")/usr/lib/robopi-config/rp-head-series-test"
+
+  if [ ! -f "$tester" ]; then
+    whiptail --msgbox "Head motor daisy-chain test helper is missing:\n$tester\n\nInstall or update robopi-config first." 12 72
+    return
+  fi
+  whiptail --title "DANGER - Active Motor Test" --yesno \
+    "This test WILL enable and zero all configured motors. The motors may move immediately.\n\nClear the mechanism and prepare the emergency stop. Continue?" \
+    16 72 || return
+  local values can_iface motor_count
+  values=$(whiptail --title "Head Daisy-chain Parameters" --inputbox \
+    "Enter: CAN-interface motor-count\n\nMotor IDs are assigned consecutively from 1 to N.\nExample: can_top 2" \
+    13 70 "can_top 2" 3>&1 1>&2 2>&3) || return
+  can_iface=$(echo "$values" | awk '{print $1}')
+  motor_count=$(echo "$values" | awk '{print $2}')
+  [ -n "$can_iface" ] && [ -n "$motor_count" ] || {
+    whiptail --msgbox "A CAN interface and motor count are required." 9 60
+    return
+  }
+  ip link show "$can_iface" >/dev/null 2>&1 || {
+    whiptail --msgbox "CAN interface $can_iface was not found." 9 58
+    return
+  }
+  whiptail --title "Final Confirmation" --yesno \
+    "ACTIVE DAISY-CHAIN TEST\n\nCAN: $can_iface\nMotor IDs: 1..$motor_count\n\nThe motors may move. Start now?" \
+    14 68 || return
+
+  clear
+  echo "Starting active head-motor daisy-chain test on $can_iface (IDs 1..$motor_count)."
+  echo "Follow the on-screen controls. Press Q to exit or Ctrl+C to abort."
+  echo
+  bash "$tester" "$can_iface" "$motor_count"
+  local rc=$?
+  echo
+  echo "Test exit code: $rc"
+  read -r -n1 -p "Press any key to return to the hardware-test menu..."
+  echo
 }
 
 do_test_wifi() {

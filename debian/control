@@ -1,15 +1,15 @@
 Source: robopi-config
 Section: utils
 Priority: optional
-Maintainer: wentywenty <2321901849@qq.com>
+Maintainer: fanxiaobinggit <16692712013@163.com>
 Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.3.0
 
 Package: robopi-config
 Architecture: arm64
 Depends: ${misc:Depends}, whiptail, parted, psmisc, bsdextrautils,
- ethtool, usbutils, iw, wireless-tools, robopi-addon
-Recommends: can-utils, gpiod, adb
+ ethtool, usbutils, iw, wireless-tools, iproute2, can-utils, robopi-addon
+Recommends: gpiod, adb
 Description: RoboParty configuration tool
  A simple configuration tool for RoboParty boards, including
  hardware testing (WiFi, Ethernet, USB, CAN, ADB, Serial,

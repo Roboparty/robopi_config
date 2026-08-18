@@ -42,6 +42,15 @@ A system configuration tool for RoboParty boards, forked from [raspi-config](htt
 - RS485 send/receive test with GPIO direction control
 - GPIO pin state viewer
 - RoboPi Addon test menu for WS2812 effects and SIG rising-edge/LED checks
+- Read-only head-motor communication test with selectable CAN interface and IDs
+- Active daisy-chain test with selectable CAN interface and motor count
+
+The read-only head-motor test sends manufacturer queries only and supports one
+to eight explicitly selected motor IDs. The active daisy-chain test assigns
+motor IDs consecutively from 1 to the selected count. It enables and zeroes the
+motors and sends MIT control frames, so motors may move immediately. Two safety
+confirmations are required, and configured motors are disabled when the test
+exits or is interrupted with **Ctrl+C**.
 
 The addon entries require `roboparty-ws2812` and `robopi-sig-key` from
 `robopi_addon`. Open **Hardware Test -> RoboPi Addon**, then select a WS2812
@@ -59,8 +68,8 @@ the terminal and can be stopped with **Ctrl+C**.
 
 - **Board**: RK3588S RoboPi2 CM5 Tablet (or compatible Orange Pi / RoboParty boards)
 - **OS**: Orange Pi 1.0.9 Jammy (Ubuntu 22.04 based) with Linux 6.1+ RT kernel
-- **Dependencies**: `whiptail`, `parted`, `psmisc`, `ethtool`, `usbutils`, `iw`, `wireless-tools`
-- **Optional**: `can-utils`, `gpiod`, `adb`, `nmtui` (NetworkManager)
+- **Dependencies**: `whiptail`, `parted`, `psmisc`, `ethtool`, `usbutils`, `iw`, `wireless-tools`, `iproute2`, `can-utils`
+- **Optional**: `gpiod`, `adb`, `nmtui` (NetworkManager)
 
 ## Quick Start
 
