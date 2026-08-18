@@ -35,6 +35,8 @@ RoboParty 板卡系统配置工具，基于 [raspi-config](https://github.com/RP
 
 ### 硬件测试
 - RoboPi Addon 测试：WS2812 灯带演示/红绿蓝/关闭，以及 SIG 上升沿触发 LED
+- 头部电机只读 CAN-FD 通信测试：可选择 CAN 接口并输入 1～8 个电机 ID，仅发送厂商查询命令，不发送运动命令
+- 头部电机主动串联测试：可选择 CAN 接口和电机数量，电机 ID 按 1～N 连续生成
 
 附加测试依赖 `robopi_addon` 提供的 `roboparty-ws2812` 和
 `robopi-sig-key`。进入 **硬件测试 -> RoboPi Addon** 后选择测试项目；动画和
@@ -42,6 +44,8 @@ SIG 监听测试会在终端显示运行状态，按 **Ctrl+C** 可停止并返�
 
 > 电气安全：GPIO1_D5 不能直接承受 5V。SIG 信号必须先转换到板卡 GPIO
 > 电压范围，再连接 RK3588S 引脚。
+
+> 电机安全：主动串联测试会使能、标零并向电机发送 MIT 控制帧，电机可能立即运动。程序执行前有两次确认，正常退出或按 Ctrl+C 时会失能已配置的电机。
 - WiFi 与以太网实时 ping 监控
 - USB 2.0 / 3.0 设备检测
 - CAN 总线接口状态
@@ -58,8 +62,8 @@ SIG 监听测试会在终端显示运行状态，按 **Ctrl+C** 可停止并返�
 
 - **硬件**：RK3588S RoboPi2 CM5 Tablet（或兼容的 Orange Pi / RoboParty 板卡）
 - **系统**：Orange Pi 1.0.9 Jammy（基于 Ubuntu 22.04），Linux 6.1+ RT 内核
-- **依赖**：`whiptail`、`parted`、`psmisc`、`ethtool`、`usbutils`、`iw`、`wireless-tools`
-- **可选**：`can-utils`、`gpiod`、`adb`、`nmtui`（NetworkManager）
+- **依赖**：`whiptail`、`parted`、`psmisc`、`ethtool`、`usbutils`、`iw`、`wireless-tools`、`iproute2`、`can-utils`
+- **可选**：`gpiod`、`adb`、`nmtui`（NetworkManager）
 
 ## 快速开始
 

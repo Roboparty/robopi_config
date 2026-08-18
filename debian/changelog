@@ -1,3 +1,13 @@
+robopi-config (0.1.2-1) stable; urgency=medium
+
+  * Add a read-only head motor CAN-FD communication test
+  * Add selectable CAN interface and motor IDs for communication testing
+  * Package and integrate the active head motor daisy-chain test
+  * Add selectable CAN interface and motor count for daisy-chain testing
+  * Disable configured motors when the active test exits or is interrupted
+
+ -- fanxiaobinggit <16692712013@163.com>  Tue, 18 Aug 2026 00:00:00 +0800
+
 robopi-config (0.1.1-1) stable; urgency=medium
 
   * update pwm test and led bottom test and new depend
