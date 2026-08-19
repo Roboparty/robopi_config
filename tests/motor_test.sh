@@ -7,7 +7,7 @@
 
 # ================= 基础配置 =================
 SKIP_INIT=true
-CAN_INTERFACE=${1:-can_top}
+CAN_INTERFACE=${1:-can0}
 MOTOR_COUNT=${2:-2}
 [[ "$CAN_INTERFACE" =~ ^[a-zA-Z0-9_.:-]+$ ]] || { echo "Invalid CAN interface" >&2; exit 1; }
 [[ "$MOTOR_COUNT" =~ ^[1-8]$ ]] || { echo "Motor count must be 1..8" >&2; exit 1; }

@@ -7,7 +7,7 @@
 
 # ================= 基础配置 =================
 SKIP_INIT=true
-CAN_INTERFACE=${1:-can_top}
+CAN_INTERFACE=${1:-can0}
 MOTOR_COUNT=${2:-2}
 [[ "$CAN_INTERFACE" =~ ^[a-zA-Z0-9_.:-]+$ ]] || { echo "Invalid CAN interface" >&2; exit 1; }
 [[ "$MOTOR_COUNT" =~ ^[1-8]$ ]] || { echo "Motor count must be 1..8" >&2; exit 1; }
@@ -88,10 +88,10 @@ draw_header() {
     local tw=${COLS:-80}
     local title=" LRO 电机 CAN/CANFD 综合测试工具 "
     local sub="接口: ${INTERFACES[*]} | 电机数: ${NUM_MOTORS} | $(date '+%Y-%m-%d %H:%M:%S')"
-    local line; line=$(printf '%*s' "$tw" '' | tr ' ' '═')
+    local line; printf -v line '%*s' "$tw" ''; line=${line// /═}
     echo -e "${COL_BCYN}╔${line}╗${COL_RST}"
     center_text "$title" "${COL_BG_BLU}"
-    local line2; line2=$(printf '%*s' "$tw" '' | tr ' ' '─')
+    local line2; printf -v line2 '%*s' "$tw" ''; line2=${line2// /─}
     echo -e "${COL_BCYN}╟${line2}╢${COL_RST}"
     center_text "$sub" "${COL_DIM}"
     echo -e "${COL_BCYN}╚${line}╝${COL_RST}"
@@ -413,8 +413,8 @@ run_load_test() {
             local progress=0
             [[ $duration -gt 0 ]] && progress=$(( ELAPSED * 30 / duration ))
             [[ $progress -gt 30 ]] && progress=30
-            local bar; bar=$(printf '%*s' "$progress" '' | tr ' ' '█')
-            local empty; empty=$(printf '%*s' "$((30 - progress))" '' | tr ' ' '░')
+            local bar; printf -v bar '%*s' "$progress" ''; bar=${bar// /█}
+            local empty; printf -v empty '%*s' "$((30 - progress))" ''; empty=${empty// /░}
 
             echo -e "  ${COL_BYEL}━━━ 测试进行中 ━━━${COL_RST}"
             echo -e "  进度: ${COL_BYEL}${bar}${COL_DIM}${empty}${COL_RST}  ${ELAPSED}s / ${duration}s  (剩余 ${REMAIN}s)"
@@ -739,9 +739,8 @@ show_main_menu() {
     echo -e "  ${COL_BCYN}━━━ 主菜单 ━━━${COL_RST}"
     echo ""
     echo -e "    ${COL_GRN}${COL_BOLD}[1]${COL_RST}  📋 查询固件版本"
-    echo -e "    ${COL_YEL}${COL_BOLD}[2]${COL_RST}  ⚡ 带载测试"
-    echo -e "    ${COL_MAG}${COL_BOLD}[3]${COL_RST}  📡 MIT 连续发送 (一拖多)"
-    echo -e "    ${COL_CYN}${COL_BOLD}[4]${COL_RST}  ⚙  MIT 参数配置"
+    echo -e "    ${COL_MAG}${COL_BOLD}[2]${COL_RST}  📡 MIT 连续发送 (一拖多)"
+    echo -e "    ${COL_CYN}${COL_BOLD}[3]${COL_RST}  ⚙  MIT 参数配置"
     echo -e "    ${COL_WHT}${COL_BOLD}[D]${COL_RST}  🔧 CAN 通信诊断"
     echo -e "    ${COL_BRED}${COL_BOLD}[Q]${COL_RST}  🚪 退出"
     echo ""
@@ -805,9 +804,8 @@ main() {
         read -rs -t 2 -N 1 key
         case "$key" in
             1) query_fw_version ;;
-            2) run_load_test ;;
-            3) run_mit_flood ;;
-            4) config_mit_params ;;
+            2) run_mit_flood ;;
+            3) config_mit_params ;;
             d|D) diag_can_comm ;;
             q|Q)
                 echo ""

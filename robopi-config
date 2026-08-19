@@ -4826,7 +4826,7 @@ do_hwtest_menu() {
       "9"  "GPIO     - GPIO/IO pin state" \
       "10" "RoboPi Addon - WS2812, SIG and LED tests" \
       "11" "Head Motor - Read-only CAN-FD communication test" \
-      "12" "Head Daisy-chain - ACTIVE motor test" \
+      "12" "Motor Daisy-chain - ACTIVE motor test" \
       3>&1 1>&2 2>&3)
     RET=$?
     [ $RET -ne 0 ] && return 0
@@ -4924,8 +4924,8 @@ do_test_head() {
   local values can_iface motor_ids
   local -a motor_id_array
   values=$(whiptail --title "Head Motor Read-only Test" --inputbox \
-    "Enter: CAN-interface motor-ID-list\n\nIDs are separated by spaces. Example: can_top 1 2 3\nOnly manufacturer query E0 00 is sent." \
-    14 72 "can_top 1 2" 3>&1 1>&2 2>&3) || return
+    "Enter: CAN-interface motor-ID-list\n\nIDs are separated by spaces. Example: can0 1 2 3\nOnly manufacturer query E0 00 is sent." \
+    14 72 "can0 1 2" 3>&1 1>&2 2>&3) || return
   can_iface=$(echo "$values" | awk '{print $1}')
   motor_ids=$(echo "$values" | cut -d' ' -f2-)
   [ -n "$can_iface" ] && [ -n "$motor_ids" ] || {
@@ -4952,16 +4952,16 @@ do_test_head_series() {
   [ -f "$tester" ] || tester="$(dirname "$0")/usr/lib/robopi-config/rp-head-series-test"
 
   if [ ! -f "$tester" ]; then
-    whiptail --msgbox "Head motor daisy-chain test helper is missing:\n$tester\n\nInstall or update robopi-config first." 12 72
+    whiptail --msgbox "Motor daisy-chain test helper is missing:\n$tester\n\nInstall or update robopi-config first." 12 72
     return
   fi
   whiptail --title "DANGER - Active Motor Test" --yesno \
     "This test WILL enable and zero all configured motors. The motors may move immediately.\n\nClear the mechanism and prepare the emergency stop. Continue?" \
     16 72 || return
   local values can_iface motor_count
-  values=$(whiptail --title "Head Daisy-chain Parameters" --inputbox \
-    "Enter: CAN-interface motor-count\n\nMotor IDs are assigned consecutively from 1 to N.\nExample: can_top 2" \
-    13 70 "can_top 2" 3>&1 1>&2 2>&3) || return
+  values=$(whiptail --title "Motor Daisy-chain Parameters" --inputbox \
+    "Enter: CAN-interface motor-count\n\nMotor IDs are assigned consecutively from 1 to N.\nExample: can0 2" \
+    13 70 "can0 2" 3>&1 1>&2 2>&3) || return
   can_iface=$(echo "$values" | awk '{print $1}')
   motor_count=$(echo "$values" | awk '{print $2}')
   [ -n "$can_iface" ] && [ -n "$motor_count" ] || {
@@ -4977,7 +4977,7 @@ do_test_head_series() {
     14 68 || return
 
   clear
-  echo "Starting active head-motor daisy-chain test on $can_iface (IDs 1..$motor_count)."
+  echo "Starting active motor daisy-chain test on $can_iface (IDs 1..$motor_count)."
   echo "Follow the on-screen controls. Press Q to exit or Ctrl+C to abort."
   echo
   bash "$tester" "$can_iface" "$motor_count"

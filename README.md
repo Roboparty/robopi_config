@@ -52,7 +52,7 @@ motors and sends MIT control frames, so motors may move immediately. Two safety
 confirmations are required, and configured motors are disabled when the test
 exits or is interrupted with **Ctrl+C**.
 
-The addon entries require `roboparty-ws2812` and `robopi-sig-key` from
+The addon entries require `robopi-ws2812` and `robopi-sig-key` from
 `robopi_addon`. Open **Hardware Test -> RoboPi Addon**, then select a WS2812
 color/demo or a SIG/LED mode. Animated and edge-monitor tests show progress in
 the terminal and can be stopped with **Ctrl+C**.

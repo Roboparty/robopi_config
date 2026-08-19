@@ -38,7 +38,7 @@ RoboParty 板卡系统配置工具，基于 [raspi-config](https://github.com/RP
 - 头部电机只读 CAN-FD 通信测试：可选择 CAN 接口并输入 1～8 个电机 ID，仅发送厂商查询命令，不发送运动命令
 - 头部电机主动串联测试：可选择 CAN 接口和电机数量，电机 ID 按 1～N 连续生成
 
-附加测试依赖 `robopi_addon` 提供的 `roboparty-ws2812` 和
+附加测试依赖 `robopi_addon` 提供的 `robopi-ws2812` 和
 `robopi-sig-key`。进入 **硬件测试 -> RoboPi Addon** 后选择测试项目；动画和
 SIG 监听测试会在终端显示运行状态，按 **Ctrl+C** 可停止并返回菜单。
 

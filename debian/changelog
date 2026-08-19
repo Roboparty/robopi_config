@@ -1,3 +1,33 @@
+robopi-config (0.1.6-1) stable; urgency=medium
+
+  * Fix garbled box-drawing characters in the LRO motor test header and
+    progress bar by replacing the locale-dependent tr calls with locale-
+    independent bash parameter substitution.
+  * Remove the "带载测试" load-test menu item.
+  * Update debian/copyright to include the current maintainer.
+
+ -- fanxiaobinggit <16692712013@163.com>  Wed, 19 Aug 2026 00:00:00 +0800
+
+robopi-config (0.1.5-1) stable; urgency=medium
+
+  * Rename the daisy-chain motor test menu entry so it is not limited to
+    head motors.
+
+ -- fanxiaobinggit <16692712013@163.com>  Wed, 19 Aug 2026 00:00:00 +0800
+
+robopi-config (0.1.4-1) stable; urgency=medium
+
+  * Default the head-motor CAN tests to the can0 interface instead of can_top.
+
+ -- fanxiaobinggit <16692712013@163.com>  Wed, 19 Aug 2026 00:00:00 +0800
+
+robopi-config (0.1.3-1) stable; urgency=medium
+
+  * Fix the RoboPi Addon hardware test to use the renamed robopi-ws2812
+    command and /dev/robopi-ws2812 device, and query the robopi-addon package.
+
+ -- fanxiaobinggit <16692712013@163.com>  Wed, 19 Aug 2026 00:00:00 +0800
+
 robopi-config (0.1.2-1) stable; urgency=medium
 
   * Add a read-only head motor CAN-FD communication test
