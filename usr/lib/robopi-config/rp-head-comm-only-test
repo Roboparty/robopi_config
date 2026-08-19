@@ -4,7 +4,7 @@ set -u
 # Read-only LeadRobot CAN-FD communication test.
 # Only E0 00 (manufacturer query) is transmitted. No motion command is used.
 
-CAN_IFACE="${1:-can_top}"
+CAN_IFACE="${1:-can0}"
 shift $(( $# > 0 ? 1 : 0 ))
 if [ "$#" -gt 0 ]; then
   MOTOR_IDS=("$@")
