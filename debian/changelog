@@ -4,6 +4,7 @@ robopi-config (0.1.6-1) stable; urgency=medium
     progress bar by replacing the locale-dependent tr calls with locale-
     independent bash parameter substitution.
   * Remove the "带载测试" load-test menu item.
+  * Update debian/copyright to include the current maintainer.
 
  -- fanxiaobinggit <16692712013@163.com>  Wed, 19 Aug 2026 00:00:00 +0800
 
