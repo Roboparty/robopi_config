@@ -1,3 +1,10 @@
+robopi-config (0.1.3-1) stable; urgency=medium
+
+  * Fix the RoboPi Addon hardware test to use the renamed robopi-ws2812
+    command and /dev/robopi-ws2812 device, and query the robopi-addon package.
+
+ -- fanxiaobinggit <16692712013@163.com>  Wed, 19 Aug 2026 00:00:00 +0800
+
 robopi-config (0.1.2-1) stable; urgency=medium
 
   * Add a read-only head motor CAN-FD communication test

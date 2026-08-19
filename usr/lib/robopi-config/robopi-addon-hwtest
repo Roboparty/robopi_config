@@ -1,7 +1,7 @@
 #!/bin/bash
 set -u
 
-WS2812_BIN=${WS2812_BIN:-roboparty-ws2812}
+WS2812_BIN=${WS2812_BIN:-robopi-ws2812}
 SIG_LED_BIN=${SIG_LED_BIN:-robopi-sig-key}
 
 usage() {
@@ -30,7 +30,7 @@ require_root() {
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "Required command is not installed: $1" >&2
-    echo "Install the roboparty-ws2812 package first." >&2
+    echo "Install the robopi-addon package first." >&2
     exit 2
   fi
 }
@@ -38,8 +38,8 @@ require_command() {
 show_status() {
   echo "========== RoboPi Addon Status =========="
   echo
-  if ! dpkg-query -W -f='Package: ${Package}\nVersion: ${Version}\nStatus: ${Status}\n' roboparty-ws2812 2>/dev/null; then
-    echo "Package: roboparty-ws2812 (not installed)"
+  if ! dpkg-query -W -f='Package: ${Package}\nVersion: ${Version}\nStatus: ${Status}\n' robopi-addon 2>/dev/null; then
+    echo "Package: robopi-addon (not installed)"
   fi
   echo
   for cmd in "$WS2812_BIN" "$SIG_LED_BIN"; do
@@ -53,9 +53,9 @@ show_status() {
   for chip in /dev/gpiochip0 /dev/gpiochip1; do
     [ -e "$chip" ] && echo "$chip: present" || echo "$chip: missing"
   done
-  [ -e /dev/roboparty-ws2812 ] && \
-    echo "/dev/roboparty-ws2812: present" || \
-    echo "/dev/roboparty-ws2812: missing"
+  [ -e /dev/robopi-ws2812 ] && \
+    echo "/dev/robopi-ws2812: present" || \
+    echo "/dev/robopi-ws2812: missing"
 }
 
 require_root
