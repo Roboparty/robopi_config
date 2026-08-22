@@ -4867,8 +4867,7 @@ do_test_robopi_addon() {
       "4" "WS2812 Green- Dim green solid color" \
       "5" "WS2812 Blue - Dim blue solid color" \
       "6" "WS2812 Off  - Turn the LED strip off" \
-      "7" "SIG/LED     - Rising edge latches LED on" \
-      "8" "SIG/LED 1s  - Rising edge lights LED for 1 second" \
+      "7" "SIG Dual Out- Rising edge sets B0 and C2 high" \
       3>&1 1>&2 2>&3)
     [ $? -ne 0 ] && return
 
@@ -4880,11 +4879,10 @@ do_test_robopi_addon() {
       4) command="ws2812-green" ;;
       5) command="ws2812-blue" ;;
       6) command="ws2812-off" ;;
-      7) command="sig-led-latch" ;;
-      8) command="sig-led-1000" ;;
+      7) command="sig-dual-high" ;;
     esac
 
-    if [ "$action" = "7" ] || [ "$action" = "8" ]; then
+    if [ "$action" = "7" ]; then
       whiptail --yesno "Electrical safety check:\n\nSIG must be within the GPIO1_D5 IO voltage range. Never connect a 5 V SIG directly to RK3588.\n\nContinue with the SIG rising-edge test?" 14 70 || continue
     fi
 
@@ -4896,8 +4894,9 @@ do_test_robopi_addon() {
       ws2812-demo)
         echo "The LED demo takes about 8 seconds and turns the strip off when complete."
         ;;
-      sig-led-*)
-        echo "Waiting for SIG rising edges. Press Ctrl+C to stop the test."
+      sig-dual-high)
+        echo "Waiting for one SIG rising edge. GPIO1_B0 and GPIO0_C2 will latch HIGH."
+        echo "Press Ctrl+C to stop and restore both outputs LOW."
         ;;
       *)
         echo "Please observe the connected hardware."

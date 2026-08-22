@@ -2,7 +2,8 @@
 set -u
 
 WS2812_BIN=${WS2812_BIN:-robopi-ws2812}
-SIG_LED_BIN=${SIG_LED_BIN:-robopi-sig-key}
+SIG_DUAL_TEST=${SIG_DUAL_TEST:-/usr/lib/robopi-config/robopi-sig-dual-output-test}
+[ -f "$SIG_DUAL_TEST" ] || SIG_DUAL_TEST="$(dirname "$0")/robopi-sig-dual-output-test"
 
 usage() {
   cat <<'EOF'
@@ -15,8 +16,7 @@ Commands:
   ws2812-green        Set all WS2812 pixels to dim green
   ws2812-blue         Set all WS2812 pixels to dim blue
   ws2812-off          Turn all WS2812 pixels off
-  sig-led-latch       Rising edge on SIG latches the LED on
-  sig-led-1000        Rising edge turns the LED on for 1000 ms
+  sig-dual-high       SIG rising edge drives GPIO1_B0 and GPIO0_C2 high
 EOF
 }
 
@@ -42,13 +42,16 @@ show_status() {
     echo "Package: robopi-addon (not installed)"
   fi
   echo
-  for cmd in "$WS2812_BIN" "$SIG_LED_BIN"; do
+  for cmd in "$WS2812_BIN"; do
     if command -v "$cmd" >/dev/null 2>&1; then
       echo "$cmd: $(command -v "$cmd")"
     else
       echo "$cmd: NOT FOUND"
     fi
   done
+  [ -f "$SIG_DUAL_TEST" ] && \
+    echo "SIG dual-output test: $SIG_DUAL_TEST" || \
+    echo "SIG dual-output test: NOT FOUND"
   echo
   for chip in /dev/gpiochip0 /dev/gpiochip1; do
     [ -e "$chip" ] && echo "$chip: present" || echo "$chip: missing"
@@ -67,8 +70,7 @@ case "${1:-}" in
   ws2812-green) require_command "$WS2812_BIN"; exec "$WS2812_BIN" solid 0 32 0 ;;
   ws2812-blue) require_command "$WS2812_BIN"; exec "$WS2812_BIN" solid 0 0 32 ;;
   ws2812-off) require_command "$WS2812_BIN"; exec "$WS2812_BIN" off ;;
-  sig-led-latch) require_command "$SIG_LED_BIN"; exec "$SIG_LED_BIN" ;;
-  sig-led-1000) require_command "$SIG_LED_BIN"; exec "$SIG_LED_BIN" --led-on-ms 1000 ;;
+  sig-dual-high) exec bash "$SIG_DUAL_TEST" ;;
   -h|--help|help) usage ;;
   *) usage >&2; exit 2 ;;
 esac
