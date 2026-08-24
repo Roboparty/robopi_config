@@ -41,7 +41,7 @@ A system configuration tool for RoboParty boards, forked from [raspi-config](htt
 - Serial port list & loopback test
 - RS485 send/receive test with GPIO direction control
 - GPIO pin state viewer
-- RoboPi Addon test menu for WS2812 effects and SIG rising-edge/LED checks
+- RoboPi Addon test menu for WS2812 effects and a SIG dual-output check
 - Read-only head-motor communication test with selectable CAN interface and IDs
 - Active daisy-chain test with selectable CAN interface and motor count
 
@@ -52,10 +52,12 @@ motors and sends MIT control frames, so motors may move immediately. Two safety
 confirmations are required, and configured motors are disabled when the test
 exits or is interrupted with **Ctrl+C**.
 
-The addon entries require `robopi-ws2812` and `robopi-sig-key` from
-`robopi_addon`. Open **Hardware Test -> RoboPi Addon**, then select a WS2812
-color/demo or a SIG/LED mode. Animated and edge-monitor tests show progress in
-the terminal and can be stopped with **Ctrl+C**.
+The WS2812 entries require `robopi-ws2812` from `robopi_addon`; the SIG
+dual-output test is included directly in `robopi-config`. Open
+**Hardware Test -> RoboPi Addon**, then select a WS2812
+color/demo or **SIG Dual Out**. The SIG test waits for a GPIO1_D5 rising edge,
+latches GPIO1_B0 and GPIO0_C2 high. Pressing **Ctrl+C** once restores both
+outputs low and returns to the Addon test menu.
 
 > Electrical safety: GPIO1_D5 is not 5 V tolerant. The SIG input must be
 > converted to the board's GPIO voltage before it reaches the RK3588S pin.
@@ -90,7 +92,7 @@ Navigate with **↑ ↓** arrow keys, **Enter** to select, **Tab** to switch but
 dpkg-buildpackage -us -uc -b
 
 # Install on target board
-sudo dpkg -i robopi-config_0.1.0_all.deb
+sudo dpkg -i robopi-config_0.1.7-1_arm64.deb
 ```
 
 ## Device Tree Overlays

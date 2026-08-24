@@ -1,0 +1,79 @@
+#!/bin/bash
+# Copyright (C) 2026 fanxiaobinggit <16692712013@163.com>
+# SPDX-License-Identifier: GPL-3.0-only
+set -u
+
+SIG_GPIO=61  # GPIO1_D5 / CN5-5
+B0_GPIO=40   # GPIO1_B0 / CN5-2
+C2_GPIO=18   # GPIO0_C2 / CN5-4
+
+gpio_path() {
+  printf '/sys/class/gpio/gpio%s' "$1"
+}
+
+export_gpio() {
+  local gpio=$1 path
+  path=$(gpio_path "$gpio")
+  [ -d "$path" ] && return 0
+  if ! echo "$gpio" > /sys/class/gpio/export 2>/dev/null; then
+    echo "GPIO$gpio is busy or cannot be exported." >&2
+    echo "Check: grep 'gpio-$gpio' /sys/kernel/debug/gpio" >&2
+    return 1
+  fi
+  for _ in $(seq 1 100); do
+    [ -d "$path" ] && return 0
+    sleep 0.01
+  done
+  echo "GPIO$gpio sysfs node was not created." >&2
+  return 1
+}
+
+set_output() {
+  echo "$2" > "$(gpio_path "$1")/direction"
+}
+
+cleanup() {
+  [ "${CLEANED_UP:-0}" = 1 ] && return
+  CLEANED_UP=1
+  set_output "$B0_GPIO" low 2>/dev/null || true
+  set_output "$C2_GPIO" low 2>/dev/null || true
+  echo
+  echo "Stopped: GPIO1_B0=LOW, GPIO0_C2=LOW"
+}
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Run this test as root (sudo)." >&2
+  exit 1
+fi
+
+export_gpio "$SIG_GPIO" || exit 1
+export_gpio "$B0_GPIO" || exit 1
+export_gpio "$C2_GPIO" || exit 1
+
+CLEANED_UP=0
+trap cleanup EXIT
+trap 'exit 130' HUP INT TERM
+
+echo in > "$(gpio_path "$SIG_GPIO")/direction"
+set_output "$B0_GPIO" low
+set_output "$C2_GPIO" low
+
+previous=$(cat "$(gpio_path "$SIG_GPIO")/value")
+if [ "$previous" = 1 ]; then
+  echo "SIG is already HIGH; waiting for LOW before arming the rising edge."
+else
+  echo "Waiting for GPIO1_D5 rising edge..."
+fi
+echo "GPIO1_B0=LOW, GPIO0_C2=LOW"
+
+while true; do
+  current=$(cat "$(gpio_path "$SIG_GPIO")/value")
+  if [ "$previous" = 0 ] && [ "$current" = 1 ]; then
+    set_output "$B0_GPIO" high
+    set_output "$C2_GPIO" high
+    echo "RISING EDGE: GPIO1_B0=HIGH, GPIO0_C2=HIGH"
+    while true; do sleep 1; done
+  fi
+  previous=$current
+  sleep 0.01
+done

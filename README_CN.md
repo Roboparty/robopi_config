@@ -34,13 +34,15 @@ RoboParty 板卡系统配置工具，基于 [raspi-config](https://github.com/RP
 - 本地链路地址回退
 
 ### 硬件测试
-- RoboPi Addon 测试：WS2812 灯带演示/红绿蓝/关闭，以及 SIG 上升沿触发 LED
+- RoboPi Addon 测试：WS2812 灯带演示/红绿蓝/关闭，以及 SIG 双路输出测试
 - 头部电机只读 CAN-FD 通信测试：可选择 CAN 接口并输入 1～8 个电机 ID，仅发送厂商查询命令，不发送运动命令
 - 头部电机主动串联测试：可选择 CAN 接口和电机数量，电机 ID 按 1～N 连续生成
 
-附加测试依赖 `robopi_addon` 提供的 `robopi-ws2812` 和
-`robopi-sig-key`。进入 **硬件测试 -> RoboPi Addon** 后选择测试项目；动画和
-SIG 监听测试会在终端显示运行状态，按 **Ctrl+C** 可停止并返回菜单。
+WS2812 测试依赖 `robopi_addon` 提供的 `robopi-ws2812`；SIG 双路输出测试
+直接包含在 `robopi-config` 中。进入 **硬件测试 -> RoboPi Addon** 后选择
+测试项目。**SIG Dual Out** 等待
+GPIO1_D5 上升沿，随后锁存 GPIO1_B0 和 GPIO0_C2 为高电平；按一次
+**Ctrl+C** 即可停止测试、将两路输出恢复为低电平并返回 Addon 测试菜单。
 
 > 电气安全：GPIO1_D5 不能直接承受 5V。SIG 信号必须先转换到板卡 GPIO
 > 电压范围，再连接 RK3588S 引脚。
@@ -84,7 +86,7 @@ sudo robopi-config do_wifi_ssid_passphrase
 dpkg-buildpackage -us -uc -b
 
 # 在目标板卡上安装
-sudo dpkg -i robopi-config_0.1.0_all.deb
+sudo dpkg -i robopi-config_0.1.7-1_arm64.deb
 ```
 
 ## 设备树叠加说明
