@@ -4814,7 +4814,7 @@ format_stty() {
 do_hwtest_menu() {
   while true; do
     FUN=$(whiptail --title "RoboParty Hardware Test" --menu "Select test item:" \
-      20 74 10 --cancel-button Back --ok-button Select \
+      23 78 13 --cancel-button Back --ok-button Select \
       "1"  "WiFi    - Real-time ping test (1s interval)" \
       "2"  "Ethernet - Real-time ping test (1s interval)" \
       "3"  "USB 2.0  - Check USB 2.0 ports (480Mbps)" \
@@ -4827,6 +4827,7 @@ do_hwtest_menu() {
       "10" "RoboPi Addon - WS2812, SIG and LED tests" \
       "11" "Head Motor - Read-only CAN-FD communication test" \
       "12" "Motor Daisy-chain - ACTIVE motor test" \
+      "13" "BMS      - Service and live communication test" \
       3>&1 1>&2 2>&3)
     RET=$?
     [ $RET -ne 0 ] && return 0
@@ -4843,9 +4844,32 @@ do_hwtest_menu() {
       10) do_test_robopi_addon ;;
       11) do_test_head ;;
       12) do_test_head_series ;;
+      13) do_test_bms ;;
       *) whiptail --msgbox "Unknown option: $FUN" 10 40 ;;
     esac
   done
+}
+
+do_test_bms() {
+  local tester="/usr/lib/robopi-config/robopi-bms-hwtest"
+  [ -f "$tester" ] || tester="$(dirname "$0")/usr/lib/robopi-config/robopi-bms-hwtest"
+
+  if [ ! -f "$tester" ]; then
+    whiptail --msgbox "BMS hardware test helper is missing:\n$tester\n\nInstall or update robopi-config first." 12 72
+    return
+  fi
+
+  whiptail --title "BMS Communication Test" --yesno \
+    "This read-only test will restart bms.service and monitor its logs for live battery data.\n\nNo OTA or battery-control command is sent. Continue?" \
+    14 72 || return
+
+  clear
+  bash "$tester"
+  local rc=$?
+  echo
+  echo "Test exit code: $rc"
+  read -r -n1 -p "Press any key to return to the hardware-test menu..."
+  echo
 }
 
 do_test_robopi_addon() {

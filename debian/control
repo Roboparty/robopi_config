@@ -9,7 +9,7 @@ Package: robopi-config
 Architecture: arm64
 Depends: ${misc:Depends}, whiptail, parted, psmisc, bsdextrautils,
  ethtool, usbutils, iw, wireless-tools, iproute2, can-utils, robopi-addon
-Recommends: gpiod, adb
+Recommends: gpiod, adb, roboparty-bms
 Description: RoboParty configuration tool
  A simple configuration tool for RoboParty boards, including
  hardware testing (WiFi, Ethernet, USB, CAN, ADB, Serial,

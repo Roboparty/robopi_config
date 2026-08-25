@@ -3,16 +3,16 @@ set -e
 
 case "$1" in
     remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
-    ;;
+        ;;
     purge)
         if [ -d /etc/X11/xorg.conf.d/ ]; then
-                rmdir --ignore-fail-on-non-empty /etc/X11/xorg.conf.d/
+            rmdir --ignore-fail-on-non-empty /etc/X11/xorg.conf.d/
         fi
         ;;
     *)
         echo "postrm called with unknown argument \`$1'" >&2
         exit 1
-    ;;
+        ;;
 esac
 
 #DEBHELPER#
