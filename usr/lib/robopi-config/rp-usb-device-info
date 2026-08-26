@@ -1,0 +1,28 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (c) 2026 YutongChenVictor
+# USB设备信息查询脚本 - 查询VID:PID为1209:2323的设备信息
+
+# 检查lsusb命令是否存在
+if ! command -v lsusb >/dev/null 2>&1; then
+    echo "错误: lsusb命令未找到，请安装usbutils包"
+    exit 1
+fi
+
+# 定义目标设备的VID和PID
+VID_PID="1209:2323"
+
+echo "正在查询USB设备 ${VID_PID} 的信息..."
+echo "========================================"
+
+# 执行lsusb命令并过滤关键信息
+lsusb -v -d "${VID_PID}" | grep -E 'bcdUSB|bcdDevice'
+
+# 检查是否有输出
+if [ $? -ne 0 ]; then
+    echo "未找到设备 ${VID_PID} 或设备未连接"
+    exit 1
+fi
+
+echo "========================================"
+echo "查询完成"

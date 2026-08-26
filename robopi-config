@@ -4827,6 +4827,7 @@ do_hwtest_menu() {
       "10" "RoboPi Addon - WS2812, SIG and LED tests" \
       "11" "Head Motor - Read-only CAN-FD communication test" \
       "12" "Motor Daisy-chain - ACTIVE motor test" \
+      "13" "Stress Test  - Long-duration reliability tests" \
       3>&1 1>&2 2>&3)
     RET=$?
     [ $RET -ne 0 ] && return 0
@@ -4843,6 +4844,7 @@ do_hwtest_menu() {
       10) do_test_robopi_addon ;;
       11) do_test_head ;;
       12) do_test_head_series ;;
+      13) do_stress_test_menu ;;
       *) whiptail --msgbox "Unknown option: $FUN" 10 40 ;;
     esac
   done
@@ -4985,6 +4987,98 @@ do_test_head_series() {
   echo "Test exit code: $rc"
   read -r -n1 -p "Press any key to return to the hardware-test menu..."
   echo
+}
+
+# ===== Stress Test Sub-menu =====
+# Long-duration reliability tests for motor, CAN interconnect and USB hub.
+# Scripts live in /usr/lib/robopi-config/rp-*-stress-test.
+
+_run_stress_script() {
+  local tester="$1"; shift
+  local label="$1"; shift
+  [ -f "$tester" ] || tester="$(dirname "$0")/usr/lib/robopi-config/$(basename "$tester")"
+  if [ ! -f "$tester" ]; then
+    whiptail --msgbox "Stress test helper is missing:\n$tester\n\nInstall or update robopi-config first." 12 72
+    return
+  fi
+  clear
+  echo "========== $label =========="
+  echo "Press Ctrl+C to abort. Logs are written under ~/."
+  echo
+  sudo bash "$tester" "$@"
+  local rc=$?
+  echo
+  echo "Test exit code: $rc"
+  read -r -n1 -p "Press any key to return to the stress-test menu..."
+  echo
+}
+
+do_stress_motor() {
+  local tester="/usr/lib/robopi-config/rp-motor-stress-test"
+  whiptail --title "Motor Stress Test" --yesno \
+    "This test drives CAN-FD motor commands for ~4 hours (default).\nIt requires sudo and creates logs under ~/motor_stress_<timestamp>/.\n\nAbort any time with Ctrl+C.\n\nStart now?" \
+    14 72 || return
+  _run_stress_script "$tester" "Motor Stress Test"
+}
+
+do_stress_can() {
+  local tester="/usr/lib/robopi-config/rp-can-stress-test"
+  whiptail --title "CAN Comm Stress Test" --yesno \
+    "This test loops CAN interconnect traffic for ~4 hours (default).\nIt requires sudo and creates logs under ~/can_comm_<timestamp>/.\n\nAbort any time with Ctrl+C.\n\nStart now?" \
+    14 72 || return
+  _run_stress_script "$tester" "CAN Comm Stress Test"
+}
+
+do_stress_usb() {
+  local tester="/usr/lib/robopi-config/rp-usb-stress-test"
+  whiptail --title "USB Stress Test" --yesno \
+    "This test cycles the USB hub reset 100 times (default).\nIt requires sudo and creates logs under ~/usb_stress_<timestamp>/.\n\nAbort any time with Ctrl+C.\n\nStart now?" \
+    14 72 || return
+  _run_stress_script "$tester" "USB Stress Test"
+}
+
+do_stress_usb_info() {
+  local tester="/usr/lib/robopi-config/rp-usb-device-info"
+  [ -f "$tester" ] || tester="$(dirname "$0")/usr/lib/robopi-config/rp-usb-device-info"
+  if [ ! -f "$tester" ]; then
+    whiptail --msgbox "USB device info helper is missing:\n$tester\n\nInstall or update robopi-config first." 12 72
+    return
+  fi
+  if ! command -v lsusb >/dev/null 2>&1; then
+    whiptail --msgbox "lsusb not found. Install usbutils first." 8 56
+    return
+  fi
+  clear
+  echo "========== USB Device Info (VID:PID 1209:2323) =========="
+  echo
+  bash "$tester"
+  local rc=$?
+  echo
+  echo "Exit code: $rc"
+  read -r -n1 -p "Press any key to return to the stress-test menu..."
+  echo
+}
+
+do_stress_test_menu() {
+  while true; do
+    local choice
+    choice=$(whiptail --title "Stress Test" --menu "Select a stress test:" \
+      18 72 8 --cancel-button Back --ok-button Select \
+      "1" "Motor Stress    - CAN-FD motor stress (default 4h)" \
+      "2" "CAN Comm Stress - CAN interconnect stress (default 4h)" \
+      "3" "USB Stress      - USB hub hot-plug (default 100 cycles)" \
+      "4" "USB Device Info - Query VID:PID 1209:2323 device info" \
+      3>&1 1>&2 2>&3)
+    local ret=$?
+    [ $ret -ne 0 ] && return 0
+    case "$choice" in
+      1) do_stress_motor ;;
+      2) do_stress_can ;;
+      3) do_stress_usb ;;
+      4) do_stress_usb_info ;;
+      *) whiptail --msgbox "Unknown option: $choice" 8 40 ;;
+    esac
+  done
 }
 
 do_test_wifi() {
@@ -5610,7 +5704,7 @@ if [ "$INTERACTIVE" = True ]; then
       "3 Interface Options" "Configure connections to peripherals" \
       "5 Localisation Options" "Configure language and regional settings" \
       "6 Advanced Options" "Configure advanced settings" \
-      "7 Hardware Test" "Test WiFi, Ethernet, USB, CAN, Serial, GPIO, HDMI" \
+      "7 Hardware Test" "Test WiFi, Ethernet, USB, CAN, Serial, GPIO, HDMI + stress tests" \
       "8 Update" "Update this tool to the latest version" \
       "9 About robopi-config" "Information about this configuration tool" \
       3>&1 1>&2 2>&3)
