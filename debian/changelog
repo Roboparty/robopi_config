@@ -1,3 +1,9 @@
+robopi-config (0.1.13-1) stable; urgency=medium
+
+  * del a little bug
+
+ -- fanxiaobinggit <16692712013@163.com>  Tue, 27 Aug 2026 14:19:00 +0800
+
 robopi-config (0.1.12-1) stable; urgency=medium
 
   * Add branch
