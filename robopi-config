@@ -4845,11 +4845,8 @@ do_hwtest_menu() {
       10) do_test_robopi_addon ;;
       11) do_test_head ;;
       12) do_test_head_series ;;
-<<<<<<< HEAD
       13) do_stress_test_menu ;;
-=======
-      13) do_test_bms ;;
->>>>>>> head-motor-tests
+      14) do_test_bms ;;
       *) whiptail --msgbox "Unknown option: $FUN" 10 40 ;;
     esac
   done
