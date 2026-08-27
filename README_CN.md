@@ -37,6 +37,7 @@ RoboParty 板卡系统配置工具，基于 [raspi-config](https://github.com/RP
 - RoboPi Addon 测试：WS2812 灯带演示/红绿蓝/关闭，以及 SIG 双路输出测试
 - 头部电机只读 CAN-FD 通信测试：可选择 CAN 接口并输入 1～8 个电机 ID，仅发送厂商查询命令，不发送运动命令
 - 头部电机主动串联测试：可选择 CAN 接口和电机数量，电机 ID 按 1～N 连续生成
+- BMS 硬件测试：检查 `roboparty-bms`、串口/CAN 配置和服务状态，重启守护进程后观察实时只读通信数据
 
 WS2812 测试依赖 `robopi_addon` 提供的 `robopi-ws2812`；SIG 双路输出测试
 直接包含在 `robopi-config` 中。进入 **硬件测试 -> RoboPi Addon** 后选择
@@ -48,6 +49,8 @@ GPIO1_D5 上升沿，随后锁存 GPIO1_B0 和 GPIO0_C2 为高电平；按一次
 > 电压范围，再连接 RK3588S 引脚。
 
 > 电机安全：主动串联测试会使能、标零并向电机发送 MIT 控制帧，电机可能立即运动。程序执行前有两次确认，正常退出或按 Ctrl+C 时会失能已配置的电机。
+
+> BMS 测试只重启 `bms.service` 并读取日志，不执行 OTA、配置写入或电池控制命令。测试默认观察 10 秒实时数据。
 - WiFi 与以太网实时 ping 监控
 - USB 2.0 / 3.0 设备检测
 - CAN 总线接口状态

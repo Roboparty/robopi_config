@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 robopi-config (0.1.11-1) stable; urgency=medium
 
   * Add Stress Test sub-menu under Hardware Test with entries for:
@@ -9,6 +10,16 @@ robopi-config (0.1.11-1) stable; urgency=medium
     /usr/lib/robopi-config/ so they are installed with the deb.
 
  -- YutongChenVictor <yutongchenvictor@foxmail.com>  Tue, 26 Aug 2026 16:40:00 +0800
+=======
+robopi-config (0.1.10-1) stable; urgency=medium
+
+  * Add a BMS hardware-test menu entry.
+  * Check the roboparty-bms package, configured serial/CAN interface, daemon
+    service state, and live read-only communication logs.
+  * Recommend roboparty-bms without making it a mandatory dependency.
+
+ -- fanxiaobinggit <16692712013@163.com>  Mon, 24 Aug 2026 19:00:00 +0800
+>>>>>>> head-motor-tests
 
 robopi-config (0.1.9-1) stable; urgency=medium
 

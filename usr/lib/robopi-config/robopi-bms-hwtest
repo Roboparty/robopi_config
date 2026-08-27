@@ -1,0 +1,109 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0
+# Copyright (C) 2026 fanxiaobinggit
+
+set -u
+
+CONFIG=/etc/default/bms_daemon
+SERVICE=bms.service
+WAIT_SECONDS=${BMS_TEST_WAIT_SECONDS:-10}
+
+if [[ $EUID -ne 0 ]]; then
+    echo "BMS hardware test must run as root." >&2
+    exit 1
+fi
+
+echo "========== RoboParty BMS Hardware Test =========="
+echo "This test only restarts the BMS daemon and reads status/log output."
+echo "No OTA, configuration-write, or battery-control command is sent."
+echo
+
+if ! dpkg-query -W -f='${db:Status-Abbrev}' roboparty-bms 2>/dev/null | grep -q '^ii '; then
+    echo "BMS_TEST_FAIL: roboparty-bms is not installed and configured." >&2
+    exit 1
+fi
+
+echo "Package: $(dpkg-query -W -f='${Package} ${Version}' roboparty-bms)"
+
+if [[ ! -x /usr/bin/bms_daemon ]]; then
+    echo "BMS_TEST_FAIL: /usr/bin/bms_daemon is missing or not executable." >&2
+    exit 1
+fi
+
+if [[ ! -r $CONFIG ]]; then
+    echo "BMS_TEST_FAIL: $CONFIG is missing or unreadable." >&2
+    exit 1
+fi
+
+# The packaged file contains simple KEY=VALUE assignments.
+# shellcheck disable=SC1090
+source "$CONFIG"
+
+: "${BMS_PORT:=}"
+: "${BMS_TYPE:=}"
+: "${BAUD_RATE:=}"
+: "${TIMEOUT_MS:=}"
+: "${BMS_ADDR:=}"
+
+echo "Configuration:"
+echo "  Type:    ${BMS_TYPE:-unset}"
+echo "  Port:    ${BMS_PORT:-unset}"
+echo "  Baud:    ${BAUD_RATE:-unset}"
+echo "  Timeout: ${TIMEOUT_MS:-unset} ms"
+echo "  Address: ${BMS_ADDR:-unset}"
+echo
+
+if [[ -z $BMS_PORT || -z $BMS_TYPE ]]; then
+    echo "BMS_TEST_FAIL: BMS_PORT or BMS_TYPE is empty." >&2
+    exit 1
+fi
+
+if [[ $BMS_TYPE == GFCAN ]]; then
+    if ! ip link show "$BMS_PORT" >/dev/null 2>&1; then
+        echo "BMS_TEST_FAIL: CAN interface $BMS_PORT does not exist." >&2
+        exit 1
+    fi
+    echo "CAN interface:"
+    ip -details -statistics link show "$BMS_PORT"
+else
+    if [[ ! -c $BMS_PORT ]]; then
+        echo "BMS_TEST_FAIL: serial device $BMS_PORT does not exist." >&2
+        exit 1
+    fi
+    echo "Serial device: $(ls -l "$BMS_PORT")"
+fi
+
+echo
+echo "Restarting $SERVICE and observing communication for ${WAIT_SECONDS}s..."
+start_time=$(date '+%Y-%m-%d %H:%M:%S')
+if ! systemctl restart "$SERVICE"; then
+    echo "BMS_TEST_FAIL: failed to restart $SERVICE." >&2
+    systemctl status "$SERVICE" --no-pager -l || true
+    exit 1
+fi
+
+sleep "$WAIT_SECONDS"
+log=$(journalctl -u "$SERVICE" --since "$start_time" --no-pager -o cat 2>/dev/null || true)
+
+echo
+echo "Recent BMS log:"
+if [[ -n $log ]]; then
+    printf '%s\n' "$log" | tail -n 40
+else
+    echo "  (no log output captured)"
+fi
+
+echo
+if ! systemctl is-active --quiet "$SERVICE"; then
+    echo "BMS_TEST_FAIL: $SERVICE is not active." >&2
+    systemctl status "$SERVICE" --no-pager -l || true
+    exit 1
+fi
+
+if grep -Eq 'Connected to BMS|\[BMS Data\]|\[CAN BMS Data\]|\[NRF PMIC\]' <<< "$log"; then
+    echo "BMS_TEST_PASS: live BMS communication data was received."
+    exit 0
+fi
+
+echo "BMS_TEST_FAIL: service is active, but no valid BMS data was observed." >&2
+exit 1

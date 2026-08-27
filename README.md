@@ -44,6 +44,7 @@ A system configuration tool for RoboParty boards, forked from [raspi-config](htt
 - RoboPi Addon test menu for WS2812 effects and a SIG dual-output check
 - Read-only head-motor communication test with selectable CAN interface and IDs
 - Active daisy-chain test with selectable CAN interface and motor count
+- BMS package, interface, service, and live read-only communication test
 
 The read-only head-motor test sends manufacturer queries only and supports one
 to eight explicitly selected motor IDs. The active daisy-chain test assigns
@@ -51,6 +52,10 @@ motor IDs consecutively from 1 to the selected count. It enables and zeroes the
 motors and sends MIT control frames, so motors may move immediately. Two safety
 confirmations are required, and configured motors are disabled when the test
 exits or is interrupted with **Ctrl+C**.
+
+The BMS hardware test checks the configured serial/CAN interface, restarts
+`bms.service`, and observes its logs for ten seconds. It does not perform OTA,
+write configuration, or send battery-control commands.
 
 The WS2812 entries require `robopi-ws2812` from `robopi_addon`; the SIG
 dual-output test is included directly in `robopi-config`. Open
