@@ -4827,11 +4827,8 @@ do_hwtest_menu() {
       "10" "RoboPi Addon - WS2812, SIG and LED tests" \
       "11" "Head Motor - Read-only CAN-FD communication test" \
       "12" "Motor Daisy-chain - ACTIVE motor test" \
-<<<<<<< HEAD
       "13" "Stress Test  - Long-duration reliability tests" \
-=======
-      "13" "BMS      - Service and live communication test" \
->>>>>>> head-motor-tests
+      "14" "BMS      - Service and live communication test" \
       3>&1 1>&2 2>&3)
     RET=$?
     [ $RET -ne 0 ] && return 0
